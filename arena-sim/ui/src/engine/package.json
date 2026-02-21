@@ -1,0 +1,15 @@
+{
+  "name": "arena-engine",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "arena_engine_bg.wasm",
+    "arena_engine.js",
+    "arena_engine.d.ts"
+  ],
+  "main": "arena_engine.js",
+  "types": "arena_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
