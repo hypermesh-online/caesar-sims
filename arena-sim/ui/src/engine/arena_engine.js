@@ -34,6 +34,14 @@ export class ArenaSimulation {
         return takeObject(ret);
     }
     /**
+     * Get node trust scores as array
+     * @returns {any}
+     */
+    get_trust_scores() {
+        const ret = wasm.arenasimulation_get_trust_scores(this.__wbg_ptr);
+        return takeObject(ret);
+    }
+    /**
      * @param {number} node_id
      */
     kill_node(node_id) {
@@ -49,6 +57,19 @@ export class ArenaSimulation {
         return this;
     }
     /**
+     * Reset simulation to initial state
+     */
+    reset() {
+        wasm.arenasimulation_reset(this.__wbg_ptr);
+    }
+    /**
+     * Run N ticks without returning results (fast batch mode for benchmarking)
+     * @param {number} ticks
+     */
+    run_batch(ticks) {
+        wasm.arenasimulation_run_batch(this.__wbg_ptr, ticks);
+    }
+    /**
      * @param {number} val
      */
     set_demand_factor(val) {
@@ -59,6 +80,13 @@ export class ArenaSimulation {
      */
     set_gold_price(val) {
         wasm.arenasimulation_set_gold_price(this.__wbg_ptr, val);
+    }
+    /**
+     * @param {number} node_id
+     * @param {number} val
+     */
+    set_node_crypto(node_id, val) {
+        wasm.arenasimulation_set_node_crypto(this.__wbg_ptr, node_id, val);
     }
     /**
      * @param {number} val

@@ -7,10 +7,23 @@ export class ArenaSimulation {
     get_nodes(): any;
     get_packet(packet_id: bigint): any;
     get_stats(): any;
+    /**
+     * Get node trust scores as array
+     */
+    get_trust_scores(): any;
     kill_node(node_id: number): void;
     constructor(node_count: number);
+    /**
+     * Reset simulation to initial state
+     */
+    reset(): void;
+    /**
+     * Run N ticks without returning results (fast batch mode for benchmarking)
+     */
+    run_batch(ticks: number): void;
     set_demand_factor(val: number): void;
     set_gold_price(val: number): void;
+    set_node_crypto(node_id: number, val: number): void;
     set_panic_level(val: number): void;
     spawn_packet(node_id: number, amount: number): bigint;
     tick(): any;
@@ -31,6 +44,10 @@ export interface InitOutput {
     readonly arenasimulation_get_stats: (a: number) => number;
     readonly arenasimulation_kill_node: (a: number, b: number) => void;
     readonly arenasimulation_get_packet: (a: number, b: bigint) => number;
+    readonly arenasimulation_run_batch: (a: number, b: number) => void;
+    readonly arenasimulation_set_node_crypto: (a: number, b: number, c: number) => void;
+    readonly arenasimulation_reset: (a: number) => void;
+    readonly arenasimulation_get_trust_scores: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number, c: number) => void;
     readonly __wbindgen_export2: (a: number, b: number) => number;
     readonly __wbindgen_export3: (a: number, b: number, c: number, d: number) => number;

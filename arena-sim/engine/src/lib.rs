@@ -1,4 +1,4 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Caesar Protocol Simulation Suite ("The Arena")
 
 use serde::{Serialize, Deserialize};
@@ -13,6 +13,10 @@ extern "C" {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NodeRole { Ingress = 0, Egress = 1, Transit = 2, NGauge = 3, Disabled = 4 }
+
+// E9: Node personality strategies
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NodeStrategy { RiskAverse = 0, Greedy = 1, Passive = 2 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimPacket {
@@ -46,7 +50,15 @@ pub struct SimNode {
     pub trust_score: f64,
     pub total_fees_earned: f64,
     pub accumulated_work: f64,
+    // E9: Node strategy
+    #[serde(default = "default_strategy")]
+    pub strategy: NodeStrategy,
+    // E12: Per-node liquidity pressure
+    #[serde(default)]
+    pub pressure: f64,
 }
+
+fn default_strategy() -> NodeStrategy { NodeStrategy::Passive }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldState {
@@ -72,7 +84,6 @@ pub struct WorldState {
     pub total_value_leaked: f64,
     pub total_network_utility: f64,
 
-    // New fields
     #[serde(default)]
     pub volatility: f64,
     #[serde(default)]
@@ -87,6 +98,18 @@ pub struct WorldState {
     pub total_output: f64,
     #[serde(default)]
     pub active_value: f64,
+    #[serde(default)]
+    pub spawn_count: u32,
+
+    // E6: Average trust score
+    #[serde(default)]
+    pub avg_trust_score: f64,
+    // E7: Organic ratio
+    #[serde(default)]
+    pub organic_ratio: f64,
+    // E8: Surge multiplier
+    #[serde(default)]
+    pub surge_multiplier: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -137,20 +160,28 @@ pub struct ArenaSimulation {
     max_active_packets: usize,
     last_gold_price: f64,
 
-    // New tracking fields
     settlement_count: u32,
     revert_count: u32,
     total_settlement_hops: u64,
     total_settlement_time: u64,
+
+    // E11: Rolling volatility window
+    gold_price_history: Vec<f64>,
 }
 
 // Internal Logic (Testable, pure Rust)
 impl ArenaSimulation {
     pub fn tick_core(&mut self) -> TickResult {
         self.state.current_tick += 1;
+        let current_tick = self.state.current_tick;
+
+        // E11: Update gold price history (rolling window of 20)
+        self.gold_price_history.push(self.state.gold_price);
+        if self.gold_price_history.len() > 20 {
+            self.gold_price_history.remove(0);
+        }
 
         // S1: Deliver in-transit packets from message queue
-        let current_tick = self.state.current_tick;
         let mut delivered = Vec::new();
         let mut remaining = Vec::new();
         for p in self.message_queue.drain(..) {
@@ -166,7 +197,6 @@ impl ArenaSimulation {
                 p.status = PacketStatus::Active;
                 let target_role = self.nodes.get(target as usize).map(|n| n.role);
                 if target_role == Some(NodeRole::Disabled) {
-                    // Collect neighbor info before mutating
                     let reroute_to = self.nodes.get(target as usize)
                         .map(|n| n.neighbors.clone())
                         .unwrap_or_default()
@@ -189,10 +219,17 @@ impl ArenaSimulation {
             }
         }
 
-        // S4: Separate volatility from peg deviation
-        let volatility = ((self.state.gold_price - self.last_gold_price) / self.last_gold_price).abs();
-        self.last_gold_price = self.state.gold_price;
+        // E11: Proper volatility via rolling window (coefficient of variation)
+        let volatility = compute_rolling_volatility(&self.gold_price_history);
         self.state.volatility = volatility;
+        self.last_gold_price = self.state.gold_price;
+
+        // E6: Trust decay toward 0.5 baseline each tick
+        for node in self.nodes.iter_mut() {
+            if node.role != NodeRole::Disabled {
+                node.trust_score += (0.5 - node.trust_score) * 0.001;
+            }
+        }
 
         // Calculate Liquidity Coefficient (Lambda)
         let total_egress_capacity: f64 = self.nodes.iter()
@@ -206,6 +243,14 @@ impl ArenaSimulation {
             + 0.1;
         let lambda = total_egress_capacity / total_in_flight;
 
+        // E8: Compute surge multiplier from lambda
+        let surge_multiplier = if lambda < 0.5 {
+            (1.0 / lambda).min(10.0)
+        } else {
+            1.0
+        };
+        self.state.surge_multiplier = surge_multiplier;
+
         // Simulate NGauge Activity
         let mut total_work = 0.0;
         for node in self.nodes.iter_mut() {
@@ -214,12 +259,13 @@ impl ArenaSimulation {
                 total_work += node.accumulated_work;
             }
         }
-        self.state.ngauge_activity_index = (total_work / (self.nodes.len() as f64 * 100.0)).min(1.0);
+        self.state.ngauge_activity_index =
+            (total_work / (self.nodes.len() as f64 * 100.0)).min(1.0);
 
         // 1. The Caesar Governor Logic
         let mut demurrage = 0.005;
         let base_fee = 0.001;
-        let sigma = 1.0 + volatility; // S4: sigma per spec formula
+        let sigma = 1.0 + volatility;
         let safe_lambda = lambda.max(0.1);
         let mut fee_rate = base_fee * (sigma / (safe_lambda * safe_lambda));
 
@@ -227,10 +273,8 @@ impl ArenaSimulation {
         let mut quadrant = "D: GOLDEN ERA";
         let mut status = "STABLE";
 
-        // S4: Compute peg deviation from effective exchange rate (after fee calc)
         let effective_rate = self.state.gold_price * (1.0 - fee_rate);
         let peg_deviation = (effective_rate - self.state.gold_price) / self.state.gold_price;
-        // This equals -fee_rate, but during panic/crisis the combined effect is larger
         let effective_deviation = peg_deviation - (self.state.panic_level * 0.15);
 
         if effective_deviation > 0.10 {
@@ -257,12 +301,35 @@ impl ArenaSimulation {
         // S3: Panic level forces toward crisis behavior
         if self.state.panic_level > 0.7 {
             fee_rate = fee_rate.max(0.05);
-            demurrage *= 0.5; // Reduce demurrage during panic (Emergency Brake)
+            demurrage *= 0.5;
         }
 
         if self.state.ngauge_activity_index > 0.5 {
             fee_rate *= 0.8;
             verification_complexity = verification_complexity.saturating_sub(1);
+        }
+
+        // E7: Organic vs Speculative Detection
+        let organic_ratio = if self.state.network_velocity > 100.0 {
+            self.state.ngauge_activity_index
+                / (self.state.network_velocity / 1000.0).max(0.1)
+        } else {
+            1.0 // Low velocity is always "organic"
+        };
+        self.state.organic_ratio = organic_ratio;
+
+        if organic_ratio < 0.3 {
+            // Speculative: high velocity but low real work
+            fee_rate *= 1.5;
+            verification_complexity += 2;
+            if status == "STABLE" {
+                status = "SPECULATION DETECTED";
+            }
+        }
+
+        // E8: Surge pricing on fee rate during liquidity crunch
+        if lambda < 0.5 {
+            fee_rate *= surge_multiplier;
         }
 
         self.state.governance_quadrant = quadrant.to_string();
@@ -286,10 +353,12 @@ impl ArenaSimulation {
                 let node_id = ingress_nodes[node_idx];
                 let amount = 1000.0 + ((current_tick + i as u64) % 10) as f64 * 100.0;
 
-                // E4: Demand destruction - cancel if fees too high
+                // E4: Demand destruction
                 if self.state.current_fee_rate > 0.10 {
-                    let cancel_prob = ((self.state.current_fee_rate - 0.10) * 5.0).min(1.0);
-                    let check = ((self.packet_id_counter * 7 + i as u64) % 100) as f64 / 100.0;
+                    let cancel_prob =
+                        ((self.state.current_fee_rate - 0.10) * 5.0).min(1.0);
+                    let check = ((self.packet_id_counter * 7 + i as u64) % 100)
+                        as f64 / 100.0;
                     if check < cancel_prob {
                         continue;
                     }
@@ -311,6 +380,7 @@ impl ArenaSimulation {
                 self.node_buffers.entry(node_id).or_default().push(packet);
                 self.nodes[node_id as usize].current_buffer_count += 1;
                 self.total_input += amount;
+                self.state.spawn_count += 1;
             }
         }
 
@@ -319,8 +389,12 @@ impl ArenaSimulation {
         let mut _reverted_count: u32 = 0;
         let node_indices: Vec<u32> = self.node_buffers.keys().cloned().collect();
 
+        // Snapshot node strategies and volatility for routing decisions
+        let current_volatility = self.state.volatility;
+
         for node_id in node_indices {
             let node_role = self.nodes[node_id as usize].role;
+            let node_strategy = self.nodes[node_id as usize].strategy;
             if node_role == NodeRole::Disabled {
                 continue;
             }
@@ -338,6 +412,17 @@ impl ArenaSimulation {
                 p.current_value *= (-demurrage).exp();
                 self.total_burned += old_v - p.current_value;
 
+                // E8: Surge pricing per packet (escalating cost for orbiting >10 ticks)
+                if let Some(orbit_start) = p.orbit_start_tick {
+                    let orbit_ticks = current_tick.saturating_sub(orbit_start);
+                    if orbit_ticks > 10 {
+                        let surge_burn = p.current_value
+                            * ((orbit_ticks - 10) as f64 * 0.01).min(0.5);
+                        p.current_value -= surge_burn;
+                        self.total_burned += surge_burn;
+                    }
+                }
+
                 // E5: Orbit timeout check
                 if p.status == PacketStatus::Orbiting {
                     if p.orbit_start_tick.is_none() {
@@ -350,59 +435,116 @@ impl ArenaSimulation {
                         _reverted_count += 1;
                         self.revert_count += 1;
                         self.nodes[node_id as usize].current_buffer_count =
-                            self.nodes[node_id as usize].current_buffer_count.saturating_sub(1);
-                        continue; // Packet exits system
+                            self.nodes[node_id as usize].current_buffer_count
+                                .saturating_sub(1);
+                        continue;
                     }
+                }
+
+                // E9: RiskAverse strategy - buffer packets during high volatility
+                if node_strategy == NodeStrategy::RiskAverse
+                    && current_volatility > 0.1
+                    && node_role != NodeRole::Egress
+                {
+                    // Hold packet in buffer, don't route
+                    buf.insert(j, p);
+                    j += 1;
+                    continue;
                 }
 
                 // Egress settlement
                 if node_role == NodeRole::Egress && p.current_value > 0.0 {
                     if self.nodes[node_id as usize].inventory_crypto >= p.current_value {
                         // S5 + E3: 80/20 reward split with velocity bonus
-                        let total_fee = (p.original_value * self.state.current_fee_rate).min(p.current_value);
+                        let total_fee = (p.original_value * self.state.current_fee_rate)
+                            .min(p.current_value);
                         p.route_history.push(node_id);
 
                         let velocity_bonus = if p.hops <= 3 { 1.2 }
                             else if p.hops <= 6 { 1.0 }
                             else { 0.8 };
 
+                        // E9: Strategy-based trust gain
+                        let trust_gain = match node_strategy {
+                            NodeStrategy::RiskAverse => 0.02,
+                            NodeStrategy::Greedy => 0.005,
+                            NodeStrategy::Passive => 0.01,
+                        };
+
+                        // E9: Greedy fee modifier
+                        let strategy_fee_mod = match node_strategy {
+                            NodeStrategy::Greedy => 1.5,
+                            _ => 1.0,
+                        };
+                        let adjusted_fee = total_fee * strategy_fee_mod;
+                        let capped_fee = adjusted_fee.min(p.current_value);
+
                         // Egress gets 80%
-                        let egress_reward = total_fee * 0.8 * velocity_bonus;
+                        let egress_reward = capped_fee * 0.8 * velocity_bonus;
                         self.nodes[node_id as usize].total_fees_earned += egress_reward;
+                        // E6: Trust increment based on strategy
                         self.nodes[node_id as usize].trust_score =
-                            (self.nodes[node_id as usize].trust_score + 0.01).min(1.0);
-                        self.total_rewards_egress += total_fee * 0.8;
+                            (self.nodes[node_id as usize].trust_score + trust_gain).min(1.0);
+                        self.total_rewards_egress += capped_fee * 0.8;
 
                         // Transit nodes split 20%
                         let transit_nodes: Vec<u32> = p.route_history.iter()
-                            .filter(|&&n| n != node_id && self.nodes.get(n as usize)
-                                .map(|node| node.role != NodeRole::Ingress).unwrap_or(false))
+                            .filter(|&&n| {
+                                n != node_id
+                                    && self.nodes.get(n as usize)
+                                        .map(|node| node.role != NodeRole::Ingress)
+                                        .unwrap_or(false)
+                            })
                             .copied()
                             .collect();
-                        let transit_pool = total_fee * 0.2;
+                        let transit_pool = capped_fee * 0.2;
                         if !transit_nodes.is_empty() {
-                            let per_transit = (transit_pool * velocity_bonus) / transit_nodes.len() as f64;
+                            let per_transit =
+                                (transit_pool * velocity_bonus) / transit_nodes.len() as f64;
                             for &tn in &transit_nodes {
                                 if let Some(node) = self.nodes.get_mut(tn as usize) {
                                     node.total_fees_earned += per_transit;
-                                    node.trust_score = (node.trust_score + 0.01).min(1.0);
+                                    let t_gain = match node.strategy {
+                                        NodeStrategy::RiskAverse => 0.02,
+                                        NodeStrategy::Greedy => 0.005,
+                                        NodeStrategy::Passive => 0.01,
+                                    };
+                                    node.trust_score =
+                                        (node.trust_score + t_gain).min(1.0);
                                 }
                             }
                         }
                         self.total_rewards_transit += transit_pool;
 
-                        let settlement_val = (p.current_value - total_fee).max(0.0);
+                        let settlement_val = (p.current_value - capped_fee).max(0.0);
                         self.nodes[node_id as usize].inventory_crypto -= p.current_value;
                         self.total_output += settlement_val;
-                        self.total_fees += total_fee;
+                        self.total_fees += capped_fee;
                         settled_count += 1;
                         self.settlement_count += 1;
                         self.total_settlement_hops += p.hops as u64;
-                        self.total_settlement_time += current_tick.saturating_sub(p.arrival_tick);
+                        self.total_settlement_time +=
+                            current_tick.saturating_sub(p.arrival_tick);
                         self.nodes[node_id as usize].current_buffer_count =
-                            self.nodes[node_id as usize].current_buffer_count.saturating_sub(1);
+                            self.nodes[node_id as usize].current_buffer_count
+                                .saturating_sub(1);
                         continue;
+                    } else {
+                        // E6: Penalty on failed routing to Egress without liquidity
+                        self.nodes[node_id as usize].trust_score =
+                            (self.nodes[node_id as usize].trust_score - 0.05).max(0.0);
                     }
+                }
+
+                // Force orbit if packet has bounced too many times (hop limit)
+                if p.hops > 20 {
+                    p.status = PacketStatus::Orbiting;
+                    if p.orbit_start_tick.is_none() {
+                        p.orbit_start_tick = Some(current_tick);
+                    }
+                    buf.insert(j, p);
+                    j += 1;
+                    continue;
                 }
 
                 // Routing: find path to Egress (skip Disabled nodes)
@@ -411,8 +553,9 @@ impl ArenaSimulation {
                     .copied()
                     .collect();
 
+                // Only consider Egress nodes with actual liquidity for routing
                 let target_egress = self.nodes.iter()
-                    .filter(|n| n.role == NodeRole::Egress)
+                    .filter(|n| n.role == NodeRole::Egress && n.inventory_crypto > 1.0)
                     .min_by(|a, b| {
                         let da = (a.x - self.nodes[node_id as usize].x).powi(2)
                             + (a.y - self.nodes[node_id as usize].y).powi(2);
@@ -429,7 +572,9 @@ impl ArenaSimulation {
                         let dist_to_target = (target.x - neighbor.x).powi(2)
                             + (target.y - neighbor.y).powi(2);
                         let congestion = neighbor.current_buffer_count as f64 * 5.0;
-                        let score = dist_to_target + congestion;
+                        // E6: Trust penalty in routing heuristic
+                        let trust_penalty = (1.0 - neighbor.trust_score) * 10.0;
+                        let score = dist_to_target + congestion + trust_penalty;
                         if score < best_score {
                             best_score = score;
                             best_neighbor = Some(n_id);
@@ -437,9 +582,8 @@ impl ArenaSimulation {
                     }
                     best_neighbor
                 } else {
-                    neighbors.iter()
-                        .min_by_key(|&&n| self.nodes[n as usize].current_buffer_count)
-                        .cloned()
+                    // No Egress with liquidity found - enter orbit
+                    None
                 };
 
                 if let Some(target) = next_hop {
@@ -448,17 +592,51 @@ impl ArenaSimulation {
                     p.hops += 1;
                     p.route_history.push(node_id);
                     p.orbit_start_tick = None; // Reset orbit timer on successful route
-                    p.arrival_tick = current_tick + 1 + self.state.verification_complexity;
+
+                    // E10: Variable latency based on distance
+                    let distance = (
+                        (self.nodes[node_id as usize].x
+                            - self.nodes[target as usize].x).powi(2)
+                        + (self.nodes[node_id as usize].y
+                            - self.nodes[target as usize].y).powi(2)
+                    ).sqrt();
+                    let base_latency = 1 + (distance as u64);
+                    p.arrival_tick =
+                        current_tick + base_latency + self.state.verification_complexity;
+
                     self.message_queue.push(p);
                     self.nodes[node_id as usize].current_buffer_count =
-                        self.nodes[node_id as usize].current_buffer_count.saturating_sub(1);
+                        self.nodes[node_id as usize].current_buffer_count
+                            .saturating_sub(1);
                 } else {
+                    // E6: Penalty when packet can't be routed (node that held it)
+                    // Only penalize if this node was supposed to route it forward
                     p.status = PacketStatus::Orbiting;
                     if p.orbit_start_tick.is_none() {
                         p.orbit_start_tick = Some(current_tick);
                     }
                     buf.insert(j, p);
                     j += 1;
+                }
+            }
+        }
+
+        // E12: Compute per-node liquidity pressure
+        for node in self.nodes.iter_mut() {
+            if node.role == NodeRole::Disabled {
+                node.pressure = 0.0;
+                continue;
+            }
+            match node.role {
+                NodeRole::Egress => {
+                    node.pressure = node.inventory_crypto
+                        / (node.current_buffer_count as f64 * 100.0 + 1.0);
+                }
+                NodeRole::Ingress => {
+                    node.pressure = node.current_buffer_count as f64 / 10.0;
+                }
+                _ => {
+                    node.pressure = node.current_buffer_count as f64 / 10.0;
                 }
             }
         }
@@ -474,7 +652,8 @@ impl ArenaSimulation {
         self.state.total_input = self.total_input;
         self.state.total_output = self.total_output;
 
-        let active_val: f64 = self.node_buffers.values().flatten().map(|p| p.current_value).sum::<f64>()
+        let active_val: f64 = self.node_buffers.values().flatten()
+            .map(|p| p.current_value).sum::<f64>()
             + self.message_queue.iter().map(|p| p.current_value).sum::<f64>();
         self.state.active_value = active_val;
         let actual = self.total_output + self.total_burned + self.total_fees + active_val;
@@ -486,6 +665,20 @@ impl ArenaSimulation {
             .count() as u32;
         self.state.orbit_count = orbit_count;
 
+        // E6: Compute average trust score
+        let trust_sum: f64 = self.nodes.iter()
+            .filter(|n| n.role != NodeRole::Disabled)
+            .map(|n| n.trust_score)
+            .sum();
+        let trust_count = self.nodes.iter()
+            .filter(|n| n.role != NodeRole::Disabled)
+            .count() as f64;
+        self.state.avg_trust_score = if trust_count > 0.0 {
+            trust_sum / trust_count
+        } else {
+            0.5
+        };
+
         let mut active_packets = self.message_queue.clone();
         for b in self.node_buffers.values() { active_packets.extend(b.clone()); }
 
@@ -494,19 +687,33 @@ impl ArenaSimulation {
             active_packets,
             node_updates: self.nodes.iter().map(|n| NodeUpdate {
                 id: n.id, buffer_count: n.current_buffer_count,
-                inventory_fiat: n.inventory_fiat, inventory_crypto: n.inventory_crypto
+                inventory_fiat: n.inventory_fiat, inventory_crypto: n.inventory_crypto,
             }).collect(),
-        }
-    }
-
-    pub fn set_node_crypto(&mut self, node_id: u32, val: f64) {
-        if let Some(node) = self.nodes.get_mut(node_id as usize) {
-            node.inventory_crypto = val;
         }
     }
 
     pub fn get_total_output(&self) -> f64 { self.total_output }
     pub fn get_total_value_leaked(&self) -> f64 { self.state.total_value_leaked }
+    pub fn get_node_pressure(&self, node_id: usize) -> f64 {
+        self.nodes.get(node_id).map_or(0.0, |n| n.pressure)
+    }
+}
+
+// E11: Compute coefficient of variation from rolling price window
+fn compute_rolling_volatility(history: &[f64]) -> f64 {
+    if history.len() < 2 {
+        return 0.0;
+    }
+    let n = history.len() as f64;
+    let mean = history.iter().sum::<f64>() / n;
+    if mean.abs() < 1e-12 {
+        return 0.0;
+    }
+    let variance = history.iter()
+        .map(|&p| (p - mean).powi(2))
+        .sum::<f64>() / n;
+    let std_dev = variance.sqrt();
+    std_dev / mean
 }
 
 // WASM Interface
@@ -529,6 +736,12 @@ impl ArenaSimulation {
                 2 => NodeRole::Transit,
                 _ => NodeRole::NGauge,
             };
+            // E9: Assign strategy cyclically
+            let strategy = match i % 3 {
+                0 => NodeStrategy::RiskAverse,
+                1 => NodeStrategy::Greedy,
+                _ => NodeStrategy::Passive,
+            };
             let gx = (i % grid_width) as f64;
             let gy = (i / grid_width) as f64;
 
@@ -538,13 +751,18 @@ impl ArenaSimulation {
             if col > 0 && (i - 1) < node_count { neighbors.push(i - 1); }
             if col < grid_width - 1 && (i + 1) < node_count { neighbors.push(i + 1); }
             if row > 0 && (i - grid_width) < node_count { neighbors.push(i - grid_width); }
-            if row < grid_height - 1 && (i + grid_width) < node_count { neighbors.push(i + grid_width); }
+            if row < grid_height - 1 && (i + grid_width) < node_count {
+                neighbors.push(i + grid_width);
+            }
 
             nodes.push(SimNode {
                 id: i, role, x: gx, y: gy,
-                inventory_fiat: 10000.0, inventory_crypto: 100.0, current_buffer_count: 0,
+                inventory_fiat: 10000.0, inventory_crypto: 100.0,
+                current_buffer_count: 0,
                 neighbors, distance_to_egress: u32::MAX,
-                trust_score: 0.5, total_fees_earned: 0.0, accumulated_work: 0.0
+                trust_score: 0.5, total_fees_earned: 0.0, accumulated_work: 0.0,
+                strategy,
+                pressure: 0.0,
             });
             node_buffers.insert(i, Vec::new());
         }
@@ -572,8 +790,8 @@ impl ArenaSimulation {
         Self {
             nodes, packets: Vec::new(), message_queue: Vec::new(),
             state: WorldState {
-                current_tick: 0, gold_price: 2600.0, peg_deviation: 0.0, network_velocity: 0.0,
-                demand_factor: 0.2, panic_level: 0.0,
+                current_tick: 0, gold_price: 2600.0, peg_deviation: 0.0,
+                network_velocity: 0.0, demand_factor: 0.2, panic_level: 0.0,
                 governance_quadrant: "D: GOLDEN ERA".to_string(),
                 governance_status: "STABLE".to_string(),
                 total_rewards_egress: 0.0, total_rewards_transit: 0.0,
@@ -583,13 +801,19 @@ impl ArenaSimulation {
                 total_value_leaked: 0.0, total_network_utility: 0.0,
                 volatility: 0.0, settlement_count: 0, revert_count: 0, orbit_count: 0,
                 total_input: 0.0, total_output: 0.0, active_value: 0.0,
+                spawn_count: 0,
+                avg_trust_score: 0.5,
+                organic_ratio: 1.0,
+                surge_multiplier: 1.0,
             },
-            node_buffers, total_input: 0.0, total_output: 0.0, total_burned: 0.0, total_fees: 0.0,
+            node_buffers, total_input: 0.0, total_output: 0.0,
+            total_burned: 0.0, total_fees: 0.0,
             total_rewards_egress: 0.0, total_rewards_transit: 0.0,
             packet_id_counter: 0, max_active_packets: 1000,
             last_gold_price: 2600.0,
             settlement_count: 0, revert_count: 0,
             total_settlement_hops: 0, total_settlement_time: 0,
+            gold_price_history: vec![2600.0],
         }
     }
 
@@ -634,7 +858,9 @@ impl ArenaSimulation {
             total_output: self.total_output,
             total_burned: self.total_burned,
             total_fees: self.total_fees,
-            total_leaked: (self.total_input - (self.total_output + self.total_burned + self.total_fees + active_val)).abs(),
+            total_leaked: (self.total_input
+                - (self.total_output + self.total_burned
+                    + self.total_fees + active_val)).abs(),
             settlement_count: self.settlement_count,
             revert_count: self.revert_count,
             orbit_count,
@@ -657,7 +883,8 @@ impl ArenaSimulation {
                     p.target_node = None;
                     p.status = PacketStatus::Active;
                     if let Some(&dest) = neighbor_ids.iter()
-                        .find(|&&n| self.nodes[n as usize].role != NodeRole::Disabled) {
+                        .find(|&&n| self.nodes[n as usize].role != NodeRole::Disabled)
+                    {
                         self.nodes[dest as usize].current_buffer_count += 1;
                         self.node_buffers.entry(dest).or_default().push(p);
                     }
@@ -675,5 +902,29 @@ impl ArenaSimulation {
             Some(p) => serde_wasm_bindgen::to_value(p).unwrap_or(JsValue::NULL),
             None => JsValue::NULL,
         }
+    }
+
+    /// Run N ticks without returning results (fast batch mode for benchmarking)
+    pub fn run_batch(&mut self, ticks: u32) {
+        for _ in 0..ticks {
+            self.tick_core();
+        }
+    }
+
+    pub fn set_node_crypto(&mut self, node_id: u32, val: f64) {
+        if let Some(node) = self.nodes.get_mut(node_id as usize) {
+            node.inventory_crypto = val;
+        }
+    }
+
+    /// Reset simulation to initial state
+    pub fn reset(&mut self) {
+        *self = ArenaSimulation::new(self.nodes.len() as u32);
+    }
+
+    /// Get node trust scores as array
+    pub fn get_trust_scores(&self) -> JsValue {
+        let scores: Vec<f64> = self.nodes.iter().map(|n| n.trust_score).collect();
+        serde_wasm_bindgen::to_value(&scores).unwrap_or(JsValue::NULL)
     }
 }
