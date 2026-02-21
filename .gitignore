@@ -1,0 +1,11 @@
+# Rust
+arena-sim/engine/target/
+arena-sim/engine/pkg/
+arena-sim/engine/pkg-node/
+
+# Node
+arena-sim/ui/node_modules/
+arena-sim/ui/dist/
+
+# Logs
+*.log
