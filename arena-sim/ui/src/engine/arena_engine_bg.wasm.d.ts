@@ -15,7 +15,6 @@ export const arenasimulation_get_packet: (a: number, b: bigint) => number;
 export const arenasimulation_run_batch: (a: number, b: number) => void;
 export const arenasimulation_set_node_crypto: (a: number, b: number, c: number) => void;
 export const arenasimulation_reset: (a: number) => void;
-export const arenasimulation_get_trust_scores: (a: number) => number;
 export const __wbindgen_export: (a: number, b: number, c: number) => void;
 export const __wbindgen_export2: (a: number, b: number) => number;
 export const __wbindgen_export3: (a: number, b: number, c: number, d: number) => number;

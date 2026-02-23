@@ -17,11 +17,31 @@ const ROLE_COLORS: Record<number, string> = {
   [NodeRole.Transit]: '#64748b', [NodeRole.NGauge]: 'var(--accent-green)',
 };
 
+const TIER_LABELS: Record<number, string> = { 0: 'L0', 1: 'L1', 2: 'L2', 3: 'L3' };
+const TIER_COLORS: Record<number, string> = { 0: '#06b6d4', 1: '#f1f5f9', 2: '#f59e0b', 3: '#a855f7' };
+const TIER_FEE_CAPS: Record<number, number> = { 0: 5.0, 1: 2.0, 2: 0.5, 3: 0.1 };
+
+const PACKET_STATUS_LABELS: Record<number, string> = {
+  0: 'Minted', 1: 'InTransit', 2: 'Delivered', 3: 'Settling',
+  4: 'Settled', 5: 'Held', 6: 'Stalled', 7: 'Dispersed',
+  8: 'Expired', 9: 'Refunded', 10: 'Dissolved',
+};
+
 interface Node {
   id: number; role: NodeRole; inventory_fiat: number; inventory_crypto: number;
   current_buffer_count: number; neighbors: number[]; x?: number; y?: number;
-  total_fees_earned?: number; trust_score?: number; accumulated_work?: number;
+  total_fees_earned?: number; accumulated_work?: number;
   strategy?: string;
+  // v0.2 fields
+  transit_fee?: number;
+  bandwidth?: number;
+  latency?: number;
+  uptime?: number;
+  tier_preference?: number | null;
+  pressure?: number;
+  upi_active?: boolean;
+  ngauge_running?: boolean;
+  kyc_valid?: boolean;
 }
 
 interface TickResult { state: WorldState; active_packets: Packet[]; node_updates: NodeUpdate[]; }
@@ -30,6 +50,13 @@ interface Packet {
   id: number; status: number; current_value: number; origin_node: number;
   target_node?: number; arrival_tick: number; original_value?: number;
   hops?: number; route_history?: number[];
+  // v0.2 fields
+  tier?: number;          // 0=L0, 1=L1, 2=L2, 3=L3
+  ttl?: number;           // expiry tick
+  hop_limit?: number;     // tier-based max hops
+  fee_budget?: number;    // pre-calculated max fees
+  fees_consumed?: number; // accumulated fees
+  fee_schedule?: number[]; // per-hop fees
 }
 
 interface WorldState {
@@ -45,6 +72,19 @@ interface WorldState {
   spawn_count?: number;
   total_spawned?: number; avg_time_to_settle?: number; avg_hops?: number;
   longest_orbit?: number;
+  // v0.2 additions
+  circuit_breaker_active?: boolean;
+  ingress_throttle?: number;
+  dissolved_count?: number;
+  held_count?: number;
+  tier_distribution?: number[];  // [L0, L1, L2, L3]
+  effective_price_composite?: number;
+  network_fee_component?: number;
+  speculation_component?: number;
+  float_component?: number;
+  tier_fee_rates?: number[];  // [L0, L1, L2, L3]
+  organic_ratio?: number;
+  surge_multiplier?: number;
 }
 
 interface MetricPoint {
@@ -55,10 +95,81 @@ interface MetricPoint {
 
 interface LogEntry { tick: number; message: string; type: 'info' | 'warn' | 'error'; }
 
+interface PassCriteria {
+  maxConservationError: number;
+  minSettlementRate?: number;
+  maxFeeCapBreaches?: number;
+  requireSettlementFinality?: boolean;
+  requireCostCertainty?: boolean;
+  requireAuditTrail?: boolean;
+}
+
+interface ScenarioConfig {
+  name: string;
+  label: string;
+  category: 'market' | 'stress' | 'fiduciary';
+  gold: number;
+  demand: number;
+  panic: number;
+  nodes: number;
+  ticks: number;
+  goldCurve?: (tick: number) => number;
+  demandCurve?: (tick: number) => number;
+  passCriteria: PassCriteria;
+}
+
+interface TickLog {
+  tick: number;
+  goldPrice: number;
+  feeRate: number;
+  demurrageRate: number;
+  pegDeviation: number;
+  networkVelocity: number;
+  volatility: number;
+  surgeMultiplier: number;
+  organicRatio: number;
+  quadrant: string;
+  conservationError: number;
+  circuitBreakerActive: boolean;
+  effectivePrice: number;
+  networkFeeComponent: number;
+  speculationComponent: number;
+  floatComponent: number;
+  tierDistribution: number[];
+  tierFeeRates: number[];
+  settlementCount: number;
+  revertCount: number;
+  dissolvedCount: number;
+  heldCount: number;
+  activePackets: number;
+  activeValue: number;
+  totalInput: number;
+  totalOutput: number;
+  totalBurned: number;
+  totalFees: number;
+  spawnCount: number;
+}
+
 interface BenchmarkResult {
-  scenario: string; settlementCount: number; revertCount: number; avgFee: number;
-  conservationError: number; totalInput: number; totalOutput: number; pass: boolean;
-  ticks: number; peakFee: number;
+  scenario: string;
+  category: 'market' | 'stress' | 'fiduciary';
+  settlementCount: number;
+  revertCount: number;
+  avgFee: number;
+  conservationError: number;
+  totalInput: number;
+  totalOutput: number;
+  pass: boolean;
+  ticks: number;
+  peakFee: number;
+  dissolvedCount: number;
+  heldCount: number;
+  feeCapBreaches: number;
+  settlementFinality: boolean;
+  costCertainty: boolean;
+  auditTrail: boolean;
+  tierBreakdown: number[];
+  tickHistory?: TickLog[];
 }
 
 interface RunStats {
@@ -68,14 +179,67 @@ interface RunStats {
   peakFee: number; longestOrbit: number;
 }
 
-type SortKey = 'id' | 'role' | 'strategy' | 'fees' | 'trust' | 'buffer' | 'crypto' | 'fiat';
+type SortKey = 'id' | 'role' | 'strategy' | 'fees' | 'capacity' | 'pressure' | 'buffer' | 'crypto' | 'fiat';
 
-const SCENARIOS: { name: string; label: string; gold: number; demand: number; panic: number }[] = [
-  { name: 'PAX_ROMANA', label: 'Pax Romana', gold: 2600, demand: 0.2, panic: 0.0 },
-  { name: 'FIREHOSE', label: 'Firehose', gold: 2600, demand: 0.9, panic: 0.1 },
-  { name: 'BANK_RUN', label: 'Bank Run', gold: 2000, demand: 0.5, panic: 0.9 },
-  { name: 'FLASH_CRASH', label: 'Flash Crash', gold: 2000, demand: 0.8, panic: 0.3 },
-  { name: 'DROUGHT', label: 'Drought', gold: 2600, demand: 0.05, panic: 0.0 },
+const SCENARIOS: ScenarioConfig[] = [
+  // Market Conditions (5)
+  { name: 'NORMAL_MARKET', label: 'Normal Market', category: 'market',
+    gold: 2600, demand: 0.3, panic: 0.0, nodes: 24, ticks: 600,
+    passCriteria: { maxConservationError: 1.0, minSettlementRate: 50 } },
+  { name: 'BULL_RUN', label: 'Bull Run', category: 'market',
+    gold: 3200, demand: 0.8, panic: 0.05, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 1.0, minSettlementRate: 15 } },
+  { name: 'BEAR_MARKET', label: 'Bear Market', category: 'market',
+    gold: 1800, demand: 0.1, panic: 0.4, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 1.0 } },
+  { name: 'BLACK_SWAN', label: 'Black Swan', category: 'market',
+    gold: 2600, demand: 0.9, panic: 0.95, nodes: 24, ticks: 300,
+    goldCurve: (tick: number) => {
+      if (tick < 100) return 2600 - tick * 11;
+      if (tick < 200) return 1500 + (tick - 100) * 3;
+      return 1800;
+    },
+    passCriteria: { maxConservationError: 2.0 } },
+  { name: 'STAGFLATION', label: 'Stagflation', category: 'market',
+    gold: 2600, demand: 0.05, panic: 0.3, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 1.0 } },
+  // Stress Tests (8)
+  { name: 'SCALE_100', label: 'Scale 100', category: 'stress',
+    gold: 2600, demand: 0.3, panic: 0.0, nodes: 100, ticks: 200,
+    passCriteria: { maxConservationError: 5.0, minSettlementRate: 30 } },
+  { name: 'SCALE_250', label: 'Scale 250', category: 'stress',
+    gold: 2600, demand: 0.3, panic: 0.0, nodes: 250, ticks: 200,
+    passCriteria: { maxConservationError: 10.0, minSettlementRate: 20 } },
+  { name: 'SCALE_500', label: 'Scale 500', category: 'stress',
+    gold: 2600, demand: 0.5, panic: 0.0, nodes: 500, ticks: 200,
+    passCriteria: { maxConservationError: 20.0 } },
+  { name: 'TIER_ISOLATION', label: 'Tier Isolation', category: 'stress',
+    gold: 2600, demand: 0.5, panic: 0.0, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 1.0 } },
+  { name: 'FEE_CAP_STRESS', label: 'Fee Cap Stress', category: 'stress',
+    gold: 2600, demand: 0.95, panic: 0.8, nodes: 24, ticks: 300,
+    passCriteria: { maxConservationError: 2.0, maxFeeCapBreaches: 0 } },
+  { name: 'GOVERNOR_STRESS', label: 'Governor Stress', category: 'stress',
+    gold: 2600, demand: 0.5, panic: 0.0, nodes: 24, ticks: 200,
+    goldCurve: (tick: number) => 2600 + Math.sin(tick / 10) * 800,
+    demandCurve: (tick: number) => 0.5 + Math.sin(tick / 15) * 0.4,
+    passCriteria: { maxConservationError: 2.0 } },
+  { name: 'DISSOLUTION_TEST', label: 'Dissolution', category: 'stress',
+    gold: 2600, demand: 0.3, panic: 0.0, nodes: 24, ticks: 8000,
+    passCriteria: { maxConservationError: 1.0 } },
+  { name: 'AML_DETECTION', label: 'AML Detection', category: 'stress',
+    gold: 2600, demand: 0.9, panic: 0.0, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 1.0 } },
+  // Fiduciary Tests (3)
+  { name: 'SETTLEMENT_FINALITY', label: 'Settlement Finality', category: 'fiduciary',
+    gold: 2600, demand: 0.5, panic: 0.0, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 0.01, requireSettlementFinality: true } },
+  { name: 'COST_CERTAINTY', label: 'Cost Certainty', category: 'fiduciary',
+    gold: 2600, demand: 0.5, panic: 0.2, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 0.1, requireCostCertainty: true } },
+  { name: 'AUDIT_TRAIL', label: 'Audit Trail', category: 'fiduciary',
+    gold: 2600, demand: 0.3, panic: 0.0, nodes: 24, ticks: 200,
+    passCriteria: { maxConservationError: 0.1, requireAuditTrail: true } },
 ];
 
 function getMintingStatus(feeRate: number): { label: string; color: string } {
@@ -114,11 +278,13 @@ function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(100);
   const [spawnAmount, setSpawnAmount] = useState(1000);
   const [packetCount, setPacketCount] = useState(0);
+  const [nodeCount, setNodeCount] = useState(24);
 
   // B1: Benchmark state
   const [benchResults, setBenchResults] = useState<BenchmarkResult[]>([]);
   const [benchRunning, setBenchRunning] = useState(false);
   const [benchProgress, setBenchProgress] = useState('');
+  const [benchCategory, setBenchCategory] = useState<'all' | 'market' | 'stress' | 'fiduciary'>('all');
 
   // B2: Halt on leak
   const [haltOnLeak, setHaltOnLeak] = useState(false);
@@ -166,6 +332,8 @@ function App() {
 
   // Suppress unused-var lint for icons referenced only in JSX
   void DollarSign; void Info; void Package; void Plus; void Download; void Search;
+  // Suppress unused-var lint for tier constants referenced only in JSX
+  void TIER_LABELS; void TIER_COLORS; void TIER_FEE_CAPS; void PACKET_STATUS_LABELS;
 
   useEffect(() => {
     init().then(() => {
@@ -175,7 +343,7 @@ function App() {
       const initialNodes = sim.get_nodes();
       setNodes(initialNodes);
       nodesRef.current = initialNodes;
-      addLog('Simulation v0.6.0: Benchmarking & Analytics Platform', 'info');
+      addLog('Simulation v0.7.0: Tier Economics & PID Governor', 'info');
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -183,6 +351,33 @@ function App() {
   const addLog = useCallback((message: string, type: 'info' | 'warn' | 'error' = 'info') => {
     setLogs(prev => [{ tick: tickRef.current, message, type }, ...prev].slice(0, 50));
   }, []);
+
+  const reinitializeEngine = useCallback((count: number) => {
+    if (engineRef.current) {
+      engineRef.current.free();
+    }
+    setIsRunning(false);
+    const sim = new ArenaSimulation(count);
+    setEngine(sim);
+    engineRef.current = sim;
+    const initialNodes = sim.get_nodes();
+    setNodes(initialNodes);
+    nodesRef.current = initialNodes;
+    setNodeCount(count);
+    setMetrics([]);
+    setLogs([]);
+    setBenchResults([]);
+    setRunStats(null);
+    tickRef.current = 0;
+    peakFeeRef.current = 0;
+    maxOrbitRef.current = 0;
+    prevLeakRef.current = 0;
+    prevBurnRef.current = 0;
+    prevSpawnedRef.current = 0;
+    prevSettledRef.current = 0;
+    pegDeviationCountRef.current = { total: 0, withinBand: 0 };
+    addLog(`Engine reinitialized with ${count} nodes`, 'info');
+  }, [addLog]);
 
   const applyPreset = useCallback((name: string) => {
     const eng = engineRef.current;
@@ -211,7 +406,7 @@ function App() {
     const settled = state.settlement_count ?? 0;
     const reverted = state.revert_count ?? 0;
     const spawned = state.total_spawned ?? state.total_input ?? 0;
-    const orbiting = state.orbit_count ?? packets.filter(p => p.status === 1).length;
+    const orbiting = state.held_count ?? state.orbit_count ?? packets.filter(p => p.status === 5).length;
     const rate = (settled + reverted) > 0 ? (settled / (settled + reverted)) * 100 : 0;
     const stats = (engineRef.current as unknown as Record<string, (() => Record<string, number>) | undefined>);
     const engineStats = typeof stats.get_stats === 'function' ? stats.get_stats() : {};
@@ -254,9 +449,9 @@ function App() {
           pegDeviationCountRef.current.withinBand++;
         }
 
-        // Track max orbit duration
+        // Track max orbit duration (status 5 = Held in v0.2)
         for (const p of result.active_packets) {
-          if (p.status === 1) {
+          if (p.status === 5) {
             const orbitDuration = state.current_tick - p.arrival_tick;
             maxOrbitRef.current = Math.max(maxOrbitRef.current, orbitDuration);
           }
@@ -350,10 +545,10 @@ function App() {
     ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const gridPadding = 80;
-    const gridWidth = 6;
-    const gridHeight = 4;
-    const cellWidth = (canvas.width - gridPadding * 2) / (gridWidth - 1);
-    const cellHeight = (canvas.height - gridPadding * 2) / (gridHeight - 1);
+    const gridWidth = Math.ceil(Math.sqrt(curNodes.length * 1.5));
+    const gridHeight = Math.ceil(curNodes.length / gridWidth);
+    const cellWidth = gridWidth > 1 ? (canvas.width - gridPadding * 2) / (gridWidth - 1) : canvas.width / 2;
+    const cellHeight = gridHeight > 1 ? (canvas.height - gridPadding * 2) / (gridHeight - 1) : canvas.height / 2;
 
     curNodes.forEach((node, i) => {
       const col = i % gridWidth;
@@ -381,10 +576,13 @@ function App() {
       });
     });
 
+    const nodeRadius = curNodes.length <= 50 ? 8 : curNodes.length <= 150 ? 5 : curNodes.length <= 300 ? 3 : 2;
+    const showLabels = curNodes.length <= 150;
+
     curNodes.forEach((node) => {
       if (!node.x || !node.y) return;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, 8 + (node.current_buffer_count * 1.5), 0, Math.PI * 2);
+      ctx.arc(node.x, node.y, nodeRadius + (node.current_buffer_count * 1.5), 0, Math.PI * 2);
       if (node.role === 0) ctx.fillStyle = '#3b82f6';
       else if (node.role === 1) ctx.fillStyle = '#f59e0b';
       else if (node.role === 2) ctx.fillStyle = '#64748b';
@@ -396,21 +594,22 @@ function App() {
       if (selectedNode?.id === node.id) {
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
       }
-      ctx.fillStyle = '#fff'; ctx.font = '10px Inter';
-      ctx.fillText(node.id.toString(), node.x - 3, node.y + 3);
+      if (showLabels) {
+        ctx.fillStyle = '#fff'; ctx.font = '10px Inter';
+        ctx.fillText(node.id.toString(), node.x - 3, node.y + 3);
+      }
     });
 
     packets.forEach(p => {
       const origin = curNodes[p.origin_node];
-      const target = p.target_node !== undefined ? curNodes[p.target_node] : null;
+      const target = p.target_node !== undefined && p.target_node !== null ? curNodes[p.target_node] : null;
       if (origin && origin.x && origin.y) {
-        const origVal = p.original_value ?? 1000;
-        const vRatio = origVal > 0 ? Math.max(0, Math.min(1, p.current_value / origVal)) : 0.5;
-        const r = Math.floor(255 * (1 - vRatio));
-        const g = Math.floor(255 * vRatio);
-        ctx.fillStyle = `rgb(${r}, ${g}, 100)`;
+        // Color by tier
+        const tierColor = TIER_COLORS[p.tier ?? 0] ?? TIER_COLORS[0];
+        ctx.fillStyle = tierColor;
+        ctx.globalAlpha = 0.8;
         ctx.beginPath();
-        if (p.status === 4 && target && target.x && target.y) {
+        if (p.status === 1 && target && target.x && target.y) {
           const progress = 1.0 - ((p.arrival_tick - curTick) / 5);
           const px = origin.x + (target.x - origin.x) * Math.max(0, Math.min(1, progress));
           const py = origin.y + (target.y - origin.y) * Math.max(0, Math.min(1, progress));
@@ -421,66 +620,157 @@ function App() {
           ctx.arc(ox, oy, 2, 0, Math.PI * 2);
         }
         ctx.fill();
+        ctx.globalAlpha = 1.0;
       }
     });
   };
 
   // B1: Benchmark runner
-  const runBenchmarkScenario = useCallback(async (scenario: typeof SCENARIOS[number]): Promise<BenchmarkResult> => {
-    const benchEngine = new ArenaSimulation(24);
+  const runBenchmarkScenario = useCallback(async (scenario: ScenarioConfig): Promise<BenchmarkResult> => {
+    const benchEngine = new ArenaSimulation(scenario.nodes);
     benchEngine.set_gold_price(scenario.gold);
     benchEngine.set_demand_factor(scenario.demand);
     benchEngine.set_panic_level(scenario.panic);
 
     let peakFee = 0;
+    let feeCapBreaches = 0;
     let lastState: WorldState | null = null;
-    const tickCount = 200;
+    let allPacketsSettledFinal = true;
+    let costCertaintyViolations = 0;
+    let auditTrailViolations = 0;
+    const tickCount = scenario.ticks;
+
+    // Tick-by-tick logging for post-simulation analysis
+    const tickHistory: TickLog[] = [];
+    const sampleInterval = 5;
 
     for (let i = 0; i < tickCount; i++) {
+      if (scenario.goldCurve) benchEngine.set_gold_price(scenario.goldCurve(i));
+      if (scenario.demandCurve) benchEngine.set_demand_factor(scenario.demandCurve(i));
+
       const result: TickResult = benchEngine.tick();
       lastState = result.state;
       peakFee = Math.max(peakFee, result.state.current_fee_rate);
-      // Yield to UI every 50 ticks
+
+      // Sample tick history for analysis
+      if (i % sampleInterval === 0) {
+        tickHistory.push({
+          tick: result.state.current_tick,
+          goldPrice: result.state.gold_price,
+          feeRate: result.state.current_fee_rate,
+          demurrageRate: result.state.current_demurrage_rate,
+          pegDeviation: result.state.peg_deviation,
+          networkVelocity: result.state.network_velocity,
+          volatility: result.state.volatility ?? 0,
+          surgeMultiplier: result.state.surge_multiplier ?? 1,
+          organicRatio: result.state.organic_ratio ?? 1,
+          quadrant: result.state.governance_quadrant,
+          conservationError: Math.abs(result.state.total_value_leaked),
+          circuitBreakerActive: result.state.circuit_breaker_active ?? false,
+          effectivePrice: result.state.effective_price_composite ?? result.state.gold_price,
+          networkFeeComponent: result.state.network_fee_component ?? 0,
+          speculationComponent: result.state.speculation_component ?? 0,
+          floatComponent: result.state.float_component ?? 0,
+          tierDistribution: result.state.tier_distribution ? [...result.state.tier_distribution] : [0, 0, 0, 0],
+          tierFeeRates: result.state.tier_fee_rates ? [...result.state.tier_fee_rates] : [0, 0, 0, 0],
+          settlementCount: result.state.settlement_count ?? 0,
+          revertCount: result.state.revert_count ?? 0,
+          dissolvedCount: result.state.dissolved_count ?? 0,
+          heldCount: result.state.held_count ?? 0,
+          activePackets: result.active_packets.length,
+          activeValue: result.state.active_value ?? 0,
+          totalInput: result.state.total_input ?? 0,
+          totalOutput: result.state.total_output ?? 0,
+          totalBurned: result.state.total_demurrage_burned,
+          totalFees: result.state.total_fees_collected,
+          spawnCount: result.state.spawn_count ?? 0,
+        });
+      }
+
+      const tierRates = result.state.tier_fee_rates ?? [0, 0, 0, 0];
+      const caps = [0.05, 0.02, 0.005, 0.001];
+      for (let t = 0; t < 4; t++) {
+        if (tierRates[t] > caps[t] + 0.0001) feeCapBreaches++;
+      }
+
+      for (const p of result.active_packets) {
+        if (p.fee_budget && p.fee_budget > 0 && (p.fees_consumed ?? 0) > p.fee_budget + 0.0001) {
+          costCertaintyViolations++;
+        }
+        if (!p.route_history || p.route_history.length === 0) {
+          auditTrailViolations++;
+        }
+        if (p.status === 4) allPacketsSettledFinal = false;
+      }
+
       if (i % 50 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
     benchEngine.free();
 
     if (!lastState) {
-      return { scenario: scenario.label, settlementCount: 0, revertCount: 0, avgFee: 0,
-        conservationError: 0, totalInput: 0, totalOutput: 0, pass: false, ticks: tickCount, peakFee: 0 };
+      return {
+        scenario: scenario.label, category: scenario.category,
+        settlementCount: 0, revertCount: 0, avgFee: 0,
+        conservationError: 0, totalInput: 0, totalOutput: 0, pass: false,
+        ticks: tickCount, peakFee: 0,
+        dissolvedCount: 0, heldCount: 0, feeCapBreaches: 0,
+        settlementFinality: false, costCertainty: false, auditTrail: false,
+        tierBreakdown: [0, 0, 0, 0],
+        tickHistory: [],
+      };
     }
 
     const settled = lastState.settlement_count ?? 0;
     const reverted = lastState.revert_count ?? 0;
     const error = Math.abs(lastState.total_value_leaked);
     const avgFee = lastState.current_fee_rate;
+    const criteria = scenario.passCriteria;
 
-    let pass = error < 1.0 && settled > 0;
-    if (scenario.name === 'BANK_RUN' && avgFee < 0.05) pass = false;
-    if (scenario.name === 'DROUGHT' && avgFee < 0.01) pass = false;
+    let pass = error <= criteria.maxConservationError;
+    if (criteria.minSettlementRate && settled > 0) {
+      const spawned = lastState.spawn_count ?? 1;
+      const rate = (settled / spawned) * 100;
+      if (rate < criteria.minSettlementRate) pass = false;
+    }
+    if (criteria.maxFeeCapBreaches !== undefined && feeCapBreaches > criteria.maxFeeCapBreaches) pass = false;
+    if (criteria.requireSettlementFinality && !allPacketsSettledFinal) pass = false;
+    if (criteria.requireCostCertainty && costCertaintyViolations > 0) pass = false;
+    if (criteria.requireAuditTrail && auditTrailViolations > 0) pass = false;
 
     return {
-      scenario: scenario.label, settlementCount: settled, revertCount: reverted,
+      scenario: scenario.label, category: scenario.category,
+      settlementCount: settled, revertCount: reverted,
       avgFee: avgFee * 100, conservationError: error,
       totalInput: lastState.total_input ?? 0, totalOutput: lastState.total_output ?? 0,
       pass, ticks: tickCount, peakFee: peakFee * 100,
+      dissolvedCount: lastState.dissolved_count ?? 0,
+      heldCount: lastState.held_count ?? 0,
+      feeCapBreaches,
+      settlementFinality: allPacketsSettledFinal,
+      costCertainty: costCertaintyViolations === 0,
+      auditTrail: auditTrailViolations === 0,
+      tierBreakdown: lastState.tier_distribution ? [...lastState.tier_distribution] : [0, 0, 0, 0],
+      tickHistory,
     };
   }, []);
 
   const runAllBenchmarks = useCallback(async () => {
     setBenchRunning(true);
     setBenchResults([]);
+    const scenariosToRun = benchCategory === 'all'
+      ? SCENARIOS
+      : SCENARIOS.filter(s => s.category === benchCategory);
     const results: BenchmarkResult[] = [];
-    for (const scenario of SCENARIOS) {
-      setBenchProgress(`Running: ${scenario.label}...`);
+    for (const scenario of scenariosToRun) {
+      setBenchProgress(`Running: ${scenario.label} (${results.length + 1}/${scenariosToRun.length})...`);
       const result = await runBenchmarkScenario(scenario);
       results.push(result);
       setBenchResults([...results]);
     }
     setBenchProgress('Complete');
     setBenchRunning(false);
-  }, [runBenchmarkScenario]);
+  }, [runBenchmarkScenario, benchCategory]);
 
   // B6: Trace packet
   const tracePacket = useCallback(() => {
@@ -495,9 +785,28 @@ function App() {
   // B7: Export data
   const exportData = useCallback(() => {
     const data = {
-      worldState, metrics, benchResults, runStats,
+      worldState, metrics, runStats,
       nodes: nodesRef.current, packets: packetsRef.current,
-      timestamp: new Date().toISOString(), version: '0.6.0',
+      benchmarks: benchResults.map(r => ({
+        scenario: r.scenario,
+        category: r.category,
+        pass: r.pass,
+        settlementCount: r.settlementCount,
+        revertCount: r.revertCount,
+        dissolvedCount: r.dissolvedCount,
+        heldCount: r.heldCount,
+        avgFee: r.avgFee,
+        peakFee: r.peakFee,
+        conservationError: r.conservationError,
+        feeCapBreaches: r.feeCapBreaches,
+        settlementFinality: r.settlementFinality,
+        costCertainty: r.costCertainty,
+        auditTrail: r.auditTrail,
+        tierBreakdown: r.tierBreakdown,
+        tickHistory: r.tickHistory ?? [],
+      })),
+      tierBreakdown: worldState?.tier_distribution ?? [0, 0, 0, 0],
+      timestamp: new Date().toISOString(), version: '0.7.0',
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -527,7 +836,8 @@ function App() {
       switch (sortBy) {
         case 'role': return dir * (a.role - b.role);
         case 'fees': return dir * ((a.total_fees_earned ?? 0) - (b.total_fees_earned ?? 0));
-        case 'trust': return dir * ((a.trust_score ?? 0) - (b.trust_score ?? 0));
+        case 'capacity': return dir * ((a.bandwidth ?? 0) - (b.bandwidth ?? 0));
+        case 'pressure': return dir * ((a.pressure ?? 0) - (b.pressure ?? 0));
         case 'buffer': return dir * (a.current_buffer_count - b.current_buffer_count);
         case 'crypto': return dir * (a.inventory_crypto - b.inventory_crypto);
         case 'fiat': return dir * (a.inventory_fiat - b.inventory_fiat);
@@ -578,7 +888,7 @@ function App() {
       <header className="header">
         <div className="title">
           <h1>THE ARENA</h1>
-          <span className="subtitle">Diagnostic Twin v0.6.0</span>
+          <span className="subtitle">Diagnostic Twin v0.7.0</span>
         </div>
         <div className="governance-section">
           <div className="quadrant-badge">{worldState?.governance_quadrant || 'WAITING'}</div>
@@ -595,8 +905,16 @@ function App() {
           <div className="stat-card"><Zap size={16} /><div className="val">V:{worldState?.verification_complexity}<br /><label>PROOF</label></div></div>
           <div className="stat-card"><ShieldAlert size={16} /><div className="val">{((worldState?.ngauge_activity_index ?? 0) * 100).toFixed(1)}%<br /><label>NGAUGE</label></div></div>
           <div className="stat-card"><Package size={16} /><div className="val">{packetCount}<br /><label>PACKETS</label></div></div>
+          <div className="stat-card"><div className="val">{worldState?.dissolved_count ?? 0}<br /><label>DISSOLVED</label></div></div>
         </div>
         <div className="controls-top">
+          <select className="node-select" value={nodeCount} onChange={(e) => reinitializeEngine(Number(e.target.value))}>
+            <option value={24}>24 Nodes</option>
+            <option value={50}>50 Nodes</option>
+            <option value={100}>100 Nodes</option>
+            <option value={250}>250 Nodes</option>
+            <option value={500}>500 Nodes</option>
+          </select>
           <button className="btn-icon" onClick={() => setIsRunning(!isRunning)}>{isRunning ? <Pause /> : <Play />}</button>
           <button className="btn-icon" onClick={() => setLogs([])}><Trash2 /></button>
           <button className="btn-icon export-icon" onClick={exportData} title="Export Data"><Download size={18} /></button>
@@ -622,7 +940,11 @@ function App() {
                 <span>Crypto:</span> <strong>{selectedNode.inventory_crypto.toFixed(3)}</strong>
                 <span>Queue:</span> <strong>{selectedNode.current_buffer_count}</strong>
                 <span>Fees Earned:</span> <strong>${(selectedNode.total_fees_earned ?? 0).toFixed(2)}</strong>
-                <span>Trust:</span> <strong>{(selectedNode.trust_score ?? 0).toFixed(3)}</strong>
+                <span>Transit Fee:</span><strong>{((selectedNode.transit_fee ?? 0) * 100).toFixed(2)}%</strong>
+                <span>Bandwidth:</span><strong>{(selectedNode.bandwidth ?? 0).toFixed(0)}</strong>
+                <span>Latency:</span><strong>{(selectedNode.latency ?? 0).toFixed(1)}ms</strong>
+                <span>Uptime:</span><strong>{((selectedNode.uptime ?? 0) * 100).toFixed(0)}%</strong>
+                <span>Pressure:</span><strong>{(selectedNode.pressure ?? 0).toFixed(3)}</strong>
                 {selectedNode.role === NodeRole.NGauge && (
                   <><span>Work:</span><strong>{(selectedNode.accumulated_work ?? 0).toFixed(1)}</strong></>
                 )}
@@ -665,6 +987,60 @@ function App() {
                   <span>REWARDS DIST:</span> <strong>${totalRewards.toFixed(2)}</strong>
                   <span className="conservation-error-label">CONSERVATION ERROR:</span>
                   <strong className={Math.abs(conservationError) < 0.01 ? 'error-ok' : 'error-fail'}>{conservationError.toFixed(6)}</strong>
+                </div>
+              </div>
+
+              {/* Governor Panel */}
+              <div className="panel governor-panel">
+                <h3><Zap size={14} /> PID GOVERNOR</h3>
+                <div className="governor-grid">
+                  <span>Quadrant:</span><strong style={{ color: governanceLevel.color }}>{worldState?.governance_quadrant ?? 'N/A'}</strong>
+                  <span>Fee Rate:</span><strong>{(feeRate * 100).toFixed(3)}%</strong>
+                  <span>Demurrage:</span><strong>{((worldState?.current_demurrage_rate ?? 0) * 100).toFixed(3)}%</strong>
+                  <span>Surge:</span><strong>{(worldState?.surge_multiplier ?? 1).toFixed(2)}x</strong>
+                  <span>Organic Ratio:</span><strong>{(worldState?.organic_ratio ?? 1).toFixed(3)}</strong>
+                  <span>Circuit Breaker:</span>
+                  <strong style={{ color: worldState?.circuit_breaker_active ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                    {worldState?.circuit_breaker_active ? 'TRIPPED' : 'OK'}
+                  </strong>
+                </div>
+                {/* Tier fee rates */}
+                <div className="tier-fees">
+                  <h4>Tier Fee Rates (cap)</h4>
+                  <div className="tier-fee-row">
+                    {[0, 1, 2, 3].map(t => (
+                      <div key={t} className="tier-fee-cell" style={{ borderColor: TIER_COLORS[t] }}>
+                        <span className="tier-label" style={{ color: TIER_COLORS[t] }}>{TIER_LABELS[t]}</span>
+                        <span className="tier-rate">{((worldState?.tier_fee_rates?.[t] ?? 0) * 100).toFixed(3)}%</span>
+                        <span className="tier-cap">cap: {TIER_FEE_CAPS[t]}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Effective Price Panel */}
+              <div className="panel price-panel">
+                <h3><DollarSign size={14} /> EFFECTIVE PRICE COMPOSITE</h3>
+                <div className="price-grid">
+                  <span>Gold Spot:</span><strong>${(worldState?.gold_price ?? 2600).toFixed(2)}</strong>
+                  <span>Network Fees:</span><strong>+{((worldState?.network_fee_component ?? 0) * 100).toFixed(4)}%</strong>
+                  <span>Speculation:</span><strong>+{((worldState?.speculation_component ?? 0) * 100).toFixed(4)}%</strong>
+                  <span>Float Shadow:</span><strong>+{((worldState?.float_component ?? 0) * 100).toFixed(4)}%</strong>
+                  <span className="composite-label">Effective Price:</span>
+                  <strong className="composite-value">${(worldState?.effective_price_composite ?? worldState?.gold_price ?? 2600).toFixed(2)}</strong>
+                </div>
+                {/* Tier distribution */}
+                <div className="tier-dist">
+                  <h4>Active Packets by Tier</h4>
+                  <div className="tier-dist-row">
+                    {[0, 1, 2, 3].map(t => (
+                      <div key={t} className="tier-dist-cell">
+                        <span style={{ color: TIER_COLORS[t] }}>{TIER_LABELS[t]}</span>
+                        <strong>{worldState?.tier_distribution?.[t] ?? 0}</strong>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -724,11 +1100,11 @@ function App() {
               {/* Controls */}
               <div className="panel controls-panel">
                 <div className="scenario-buttons">
-                  <button className="btn success" onClick={() => { applyPreset('PAX_ROMANA'); addLog('Preset applied: PAX_ROMANA', 'info'); }}>Pax</button>
-                  <button className="btn primary" onClick={() => { applyPreset('FIREHOSE'); addLog('Preset applied: FIREHOSE', 'info'); }}>Fire</button>
-                  <button className="btn danger" onClick={() => { applyPreset('BANK_RUN'); addLog('Preset applied: BANK_RUN', 'info'); }}>Bank</button>
-                  <button className="btn warning" onClick={() => { applyPreset('FLASH_CRASH'); addLog('Preset applied: FLASH_CRASH', 'info'); }}>Crash</button>
-                  <button className="btn muted" onClick={() => { applyPreset('DROUGHT'); addLog('Preset applied: DROUGHT', 'info'); }}>Drought</button>
+                  <button className="btn success" onClick={() => { applyPreset('NORMAL_MARKET'); addLog('Preset: Normal Market', 'info'); }}>Normal</button>
+                  <button className="btn primary" onClick={() => { applyPreset('BULL_RUN'); addLog('Preset: Bull Run', 'info'); }}>Bull</button>
+                  <button className="btn danger" onClick={() => { applyPreset('BEAR_MARKET'); addLog('Preset: Bear Market', 'info'); }}>Bear</button>
+                  <button className="btn warning" onClick={() => { applyPreset('BLACK_SWAN'); addLog('Preset: Black Swan', 'info'); }}>Swan</button>
+                  <button className="btn muted" onClick={() => { applyPreset('STAGFLATION'); addLog('Preset: Stagflation', 'info'); }}>Stag</button>
                 </div>
                 <div className="slider-group">
                   <label>Gold: ${(worldState?.gold_price ?? 2600).toFixed(0)}</label>
@@ -773,14 +1149,22 @@ function App() {
             <div className="bench-scroll">
               {/* B1: Benchmark Runner */}
               <div className="panel bench-panel">
-                <h3>AUTOMATED SCENARIO RUNNER</h3>
+                <h3>AUTOMATED SCENARIO RUNNER (16 Scenarios)</h3>
+                <div className="bench-category-tabs">
+                  {(['all', 'market', 'stress', 'fiduciary'] as const).map(cat => (
+                    <button key={cat} className={`btn-sm ${benchCategory === cat ? 'tab-active' : ''}`}
+                      onClick={() => setBenchCategory(cat)}>
+                      {cat.toUpperCase()} ({cat === 'all' ? SCENARIOS.length : SCENARIOS.filter(s => s.category === cat).length})
+                    </button>
+                  ))}
+                </div>
                 <div className="bench-controls">
                   <button className="btn primary bench-run-all" onClick={runAllBenchmarks} disabled={benchRunning}>
-                    {benchRunning ? benchProgress : 'RUN ALL SCENARIOS'}
+                    {benchRunning ? benchProgress : `RUN ${benchCategory === 'all' ? 'ALL' : benchCategory.toUpperCase()} SCENARIOS`}
                   </button>
                   <div className="bench-individual">
-                    {SCENARIOS.map(s => (
-                      <button key={s.name} className="btn muted bench-single" disabled={benchRunning}
+                    {SCENARIOS.filter(s => benchCategory === 'all' || s.category === benchCategory).map(s => (
+                      <button key={s.name} className={`btn muted bench-single bench-cat-${s.category}`} disabled={benchRunning}
                         onClick={async () => {
                           setBenchRunning(true);
                           setBenchProgress(`Running: ${s.label}...`);
@@ -801,19 +1185,52 @@ function App() {
                   <div className="bench-table-wrap">
                     <table className="bench-table">
                       <thead>
-                        <tr><th>Scenario</th><th>Settled</th><th>Reverted</th><th>Avg Fee</th><th>Error</th><th>Peak Fee</th><th>Result</th></tr>
+                        <tr>
+                          <th>Category</th><th>Scenario</th><th>Nodes</th><th>Ticks</th>
+                          <th>Settled</th><th>Reverted</th><th>Dissolved</th>
+                          <th>Avg Fee</th><th>Error</th><th>Peak Fee</th>
+                          <th>Result</th>
+                        </tr>
                       </thead>
                       <tbody>
-                        {benchResults.map((r, i) => (
-                          <tr key={i} className={`bench-result ${r.pass ? 'pass' : 'fail'}`}>
-                            <td>{r.scenario}</td><td>{r.settlementCount}</td><td>{r.revertCount}</td>
-                            <td>{r.avgFee.toFixed(2)}%</td><td>{r.conservationError.toFixed(6)}</td>
-                            <td>{r.peakFee.toFixed(2)}%</td>
-                            <td><span className={`metric-badge ${r.pass ? 'pass' : 'fail'}`}>{r.pass ? 'PASS' : 'FAIL'}</span></td>
-                          </tr>
-                        ))}
+                        {benchResults
+                          .filter(r => benchCategory === 'all' || r.category === benchCategory)
+                          .map((r, i) => {
+                            const scenario = SCENARIOS.find(s => s.label === r.scenario);
+                            return (
+                              <tr key={i} className={`bench-result ${r.pass ? 'pass' : 'fail'} bench-cat-${r.category}`}>
+                                <td><span className={`cat-badge cat-${r.category}`}>{r.category}</span></td>
+                                <td>{r.scenario}</td>
+                                <td>{scenario?.nodes ?? 24}</td>
+                                <td>{r.ticks}</td>
+                                <td>{r.settlementCount}</td>
+                                <td>{r.revertCount}</td>
+                                <td>{r.dissolvedCount}</td>
+                                <td>{r.avgFee.toFixed(2)}%</td>
+                                <td>{r.conservationError.toFixed(6)}</td>
+                                <td>{r.peakFee.toFixed(2)}%</td>
+                                <td>
+                                  <span className={`metric-badge ${r.pass ? 'pass' : 'fail'}`}>{r.pass ? 'PASS' : 'FAIL'}</span>
+                                  {r.category === 'fiduciary' && (
+                                    <span className="fiduciary-badges">
+                                      {r.settlementFinality && <span className="fid-badge">FIN</span>}
+                                      {r.costCertainty && <span className="fid-badge">COST</span>}
+                                      {r.auditTrail && <span className="fid-badge">AUDIT</span>}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {benchResults.length > 0 && (
+                  <div className="bench-export-row">
+                    <button className="btn primary" onClick={exportData}>
+                      <Download size={14} /> Export Full Analysis ({benchResults.reduce((sum, r) => sum + (r.tickHistory?.length ?? 0), 0)} data points)
+                    </button>
                   </div>
                 )}
               </div>
@@ -870,6 +1287,12 @@ function App() {
                     <span>Avg Hops:</span><strong>{runStats.avgHops.toFixed(1)}</strong>
                     <span>Conservation Error:</span><strong>{runStats.conservationError.toFixed(6)}</strong>
                     <span>Longest Orbit:</span><strong>{runStats.longestOrbit} ticks</strong>
+                    <span>Dissolved:</span><strong>{worldState?.dissolved_count ?? 0}</strong>
+                    <span>Held:</span><strong>{worldState?.held_count ?? 0}</strong>
+                    <span>Circuit Breaker:</span>
+                    <strong style={{ color: worldState?.circuit_breaker_active ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                      {worldState?.circuit_breaker_active ? 'TRIPPED' : 'OK'}
+                    </strong>
                   </div>
                 </div>
               )}
@@ -888,7 +1311,7 @@ function App() {
                         <tr>
                           {([
                             ['id', 'ID'], ['role', 'Role'], ['fees', 'Fees Earned'],
-                            ['trust', 'Trust'], ['buffer', 'Buffer'], ['crypto', 'Crypto'], ['fiat', 'Fiat'],
+                            ['capacity', 'Capacity'], ['pressure', 'Pressure'], ['buffer', 'Buffer'], ['crypto', 'Crypto'], ['fiat', 'Fiat'],
                           ] as [SortKey, string][]).map(([key, label]) => (
                             <th key={key} onClick={() => toggleSort(key)} className="sortable-th">
                               {label} {sortBy === key ? (sortDir === 'asc' ? '\u25B2' : '\u25BC') : ''}
@@ -902,7 +1325,8 @@ function App() {
                             <td>{n.id}</td>
                             <td><span className="role-chip" style={{ background: ROLE_COLORS[n.role] }}>{ROLE_LABELS[n.role]}</span></td>
                             <td>${(n.total_fees_earned ?? 0).toFixed(2)}</td>
-                            <td>{(n.trust_score ?? 0).toFixed(3)}</td>
+                            <td>{(n.bandwidth ?? 0).toFixed(0)}</td>
+                            <td>{(n.pressure ?? 0).toFixed(3)}</td>
                             <td>{n.current_buffer_count}</td>
                             <td>{n.inventory_crypto.toFixed(3)}</td>
                             <td>${n.inventory_fiat.toFixed(0)}</td>
@@ -928,7 +1352,7 @@ function App() {
                     <div className="trace-grid">
                       <span>ID:</span><strong>{tracedPacket.id}</strong>
                       <span>Origin:</span><strong>Node #{tracedPacket.origin_node}</strong>
-                      <span>Status:</span><strong>{['Active', 'Orbiting', 'Settled', 'Reverted', 'InTransit'][tracedPacket.status] ?? tracedPacket.status}</strong>
+                      <span>Status:</span><strong>{PACKET_STATUS_LABELS[tracedPacket.status] ?? `Unknown(${tracedPacket.status})`}</strong>
                       <span>Original Value:</span><strong>${(tracedPacket.original_value ?? 0).toFixed(2)}</strong>
                       <span>Current Value:</span><strong>${tracedPacket.current_value.toFixed(2)}</strong>
                       <span>Value Decay:</span>
@@ -937,6 +1361,14 @@ function App() {
                       </strong>
                       <span>Hops:</span><strong>{tracedPacket.hops ?? 'N/A'}</strong>
                       <span>Arrival Tick:</span><strong>{tracedPacket.arrival_tick}</strong>
+                      <span>Tier:</span>
+                      <strong style={{ color: TIER_COLORS[tracedPacket.tier ?? 0] }}>
+                        {TIER_LABELS[tracedPacket.tier ?? 0]}
+                      </strong>
+                      <span>TTL:</span><strong>{tracedPacket.ttl ?? 'N/A'}</strong>
+                      <span>Hop Limit:</span><strong>{tracedPacket.hop_limit ?? 'N/A'}</strong>
+                      <span>Fee Budget:</span><strong>${(tracedPacket.fee_budget ?? 0).toFixed(4)}</strong>
+                      <span>Fees Consumed:</span><strong>${(tracedPacket.fees_consumed ?? 0).toFixed(4)}</strong>
                     </div>
                     {tracedPacket.route_history && tracedPacket.route_history.length > 0 && (
                       <div className="trace-route">
@@ -956,6 +1388,19 @@ function App() {
                           ? 'var(--accent-red)' : 'var(--accent-green)',
                       }} />
                     </div>
+                    {/* Fee budget bar */}
+                    {tracedPacket.fee_budget && tracedPacket.fee_budget > 0 && (
+                      <div className="fee-budget-bar-container">
+                        <span className="fee-budget-label">Fee Budget: ${(tracedPacket.fees_consumed ?? 0).toFixed(2)} / ${tracedPacket.fee_budget.toFixed(2)}</span>
+                        <div className="decay-bar-container">
+                          <div className="decay-bar" style={{
+                            width: `${((tracedPacket.fees_consumed ?? 0) / tracedPacket.fee_budget) * 100}%`,
+                            background: (tracedPacket.fees_consumed ?? 0) > tracedPacket.fee_budget * 0.8
+                              ? 'var(--accent-red)' : 'var(--accent-blue)',
+                          }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -7,10 +7,6 @@ export class ArenaSimulation {
     get_nodes(): any;
     get_packet(packet_id: bigint): any;
     get_stats(): any;
-    /**
-     * Get node trust scores as array
-     */
-    get_trust_scores(): any;
     kill_node(node_id: number): void;
     constructor(node_count: number);
     /**
@@ -47,7 +43,6 @@ export interface InitOutput {
     readonly arenasimulation_run_batch: (a: number, b: number) => void;
     readonly arenasimulation_set_node_crypto: (a: number, b: number, c: number) => void;
     readonly arenasimulation_reset: (a: number) => void;
-    readonly arenasimulation_get_trust_scores: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number, c: number) => void;
     readonly __wbindgen_export2: (a: number, b: number) => number;
     readonly __wbindgen_export3: (a: number, b: number, c: number, d: number) => number;

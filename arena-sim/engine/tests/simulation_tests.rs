@@ -121,21 +121,22 @@ mod tests {
     // ========== Test Suite C: Sybil Attack (Fake Nodes) ==========
 
     #[test]
-    fn test_sybil_trust_penalty() {
+    fn test_sybil_capacity_defense() {
+        // Sybil Egress nodes with zero liquidity should not settle traffic.
+        // Capacity-based routing routes around them to honest Egress nodes.
         let mut sim = ArenaSimulation::new(24);
 
-        // Make several "fake" Egress nodes -- set their crypto to 0
-        // Nodes 1, 5, 9, 13 are Egress (i % 4 == 1)
+        // Strip half the Egress nodes of liquidity (simulate Sybil Egress)
+        // Nodes 1, 5, 9 are Egress (i % 4 == 1) - set to zero
         sim.set_node_crypto(1, 0.0);
         sim.set_node_crypto(5, 0.0);
         sim.set_node_crypto(9, 0.0);
-        // Leave node 13, 17, 21 with liquidity as honest Egress
-        // Boost honest Egress liquidity for reliable settlement
+        // Honest Egress: 13, 17, 21 keep default liquidity
         sim.set_node_crypto(13, 50000.0);
         sim.set_node_crypto(17, 50000.0);
         sim.set_node_crypto(21, 50000.0);
 
-        // Spawn packets
+        // Spawn packets at Ingress nodes
         for i in 0..50u32 {
             let ingress_id = (i * 4) % 24;
             if ingress_id % 4 == 0 {
@@ -143,12 +144,12 @@ mod tests {
             }
         }
 
-        // Run for 300 ticks (E10 variable latency needs more time)
+        // Run for 300 ticks (E10 variable latency needs time)
         for _ in 0..300 {
             sim.tick_core();
         }
 
-        // Conservation must hold
+        // Conservation must hold despite Sybil nodes
         let leak = sim.get_total_value_leaked();
         assert!(
             leak < 1.0,
@@ -156,7 +157,7 @@ mod tests {
             leak
         );
 
-        // Some packets should still settle at honest Egress nodes
+        // Honest Egress nodes should still settle packets
         let output = sim.get_total_output();
         assert!(output > 0.0, "No settlements despite honest Egress nodes");
     }
@@ -243,24 +244,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_trust_score_dynamics() {
-        let mut sim = ArenaSimulation::new(24);
-        // Fake Egress with no liquidity should lose trust
-        sim.set_node_crypto(1, 0.0);
-        sim.spawn_packet(0, 100.0);
-
-        for _ in 0..50 {
-            sim.tick_core();
-        }
-
-        // The avg_trust_score should be tracked
-        let result = sim.tick_core();
-        assert!(
-            result.state.avg_trust_score > 0.0,
-            "avg_trust_score not computed"
-        );
-    }
 
     #[test]
     fn test_organic_ratio_computed() {

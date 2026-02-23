@@ -34,14 +34,6 @@ export class ArenaSimulation {
         return takeObject(ret);
     }
     /**
-     * Get node trust scores as array
-     * @returns {any}
-     */
-    get_trust_scores() {
-        const ret = wasm.arenasimulation_get_trust_scores(this.__wbg_ptr);
-        return takeObject(ret);
-    }
-    /**
      * @param {number} node_id
      */
     kill_node(node_id) {

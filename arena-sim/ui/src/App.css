@@ -181,10 +181,11 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
 .bench-run-all {
   width: 100%; padding: 0.5rem; font-size: 0.75rem; letter-spacing: 0.05em;
 }
-.bench-individual { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; }
+.bench-individual { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
 .bench-single { font-size: 0.6rem; padding: 0.25rem; }
 
 /* Bench Results Table */
+.bench-export-row { margin-top: 8px; display: flex; justify-content: flex-end; }
 .bench-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
 .bench-table {
   width: 100%; border-collapse: collapse; font-size: 0.65rem;
@@ -272,3 +273,66 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; heigh
   border-radius: 3px; overflow: hidden;
 }
 .decay-bar { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+/* Governor Panel */
+.governor-panel { border-left: 3px solid var(--accent-blue); }
+.governor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 0.7rem; }
+.tier-fees { margin-top: 8px; }
+.tier-fees h4 { font-size: 0.6rem; color: var(--text-secondary); margin: 4px 0; }
+.tier-fee-row { display: flex; gap: 8px; }
+.tier-fee-cell {
+  flex: 1; padding: 4px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.03); border-left: 2px solid;
+  font-size: 0.6rem; text-align: center;
+}
+.tier-label { font-weight: 700; display: block; }
+.tier-rate { display: block; font-size: 0.65rem; }
+.tier-cap { display: block; color: var(--text-secondary); font-size: 0.55rem; }
+
+/* Effective Price Panel */
+.price-panel { border-left: 3px solid var(--accent-gold); }
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 0.7rem; }
+.composite-label { font-weight: 700; color: var(--accent-gold); }
+.composite-value { font-size: 0.85rem; color: var(--accent-gold); }
+.tier-dist { margin-top: 8px; }
+.tier-dist h4 { font-size: 0.6rem; color: var(--text-secondary); margin: 4px 0; }
+.tier-dist-row { display: flex; gap: 12px; }
+.tier-dist-cell { text-align: center; font-size: 0.65rem; }
+
+/* Node Count Selector */
+.node-select {
+  background: var(--bg-panel); color: var(--text-primary);
+  border: 1px solid #334155; border-radius: 4px;
+  padding: 4px 8px; font-size: 0.7rem; cursor: pointer;
+}
+
+/* Fee budget bar */
+.fee-budget-bar-container { margin-top: 4px; }
+.fee-budget-label { font-size: 0.6rem; color: var(--text-secondary); }
+
+/* Bench category tabs */
+.bench-category-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.bench-category-tabs .btn-sm { font-size: 0.6rem; padding: 3px 8px; }
+.tab-active { background: var(--accent-blue) !important; color: white !important; }
+
+/* Category badges */
+.cat-badge {
+  font-size: 0.55rem; padding: 1px 4px; border-radius: 2px;
+  text-transform: uppercase; font-weight: 600;
+}
+.cat-market { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+.cat-stress { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+.cat-fiduciary { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+
+/* Category-colored scenario buttons */
+.bench-cat-market { border-left: 2px solid var(--accent-blue) !important; }
+.bench-cat-stress { border-left: 2px solid var(--accent-red) !important; }
+.bench-cat-fiduciary { border-left: 2px solid var(--accent-green) !important; }
+
+/* Fiduciary badges */
+.fiduciary-badges { display: inline-flex; gap: 2px; margin-left: 4px; }
+.fid-badge {
+  font-size: 0.5rem; padding: 0 3px; border-radius: 2px;
+  background: rgba(16, 185, 129, 0.3); color: var(--accent-green);
+  font-weight: 600;
+}
