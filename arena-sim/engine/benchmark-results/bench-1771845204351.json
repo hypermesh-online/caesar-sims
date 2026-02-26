@@ -1,0 +1,466 @@
+{
+  "timestamp": "1771845204351",
+  "version": "1.0.0",
+  "prng": "ChaCha8Rng",
+  "n_runs_per_scenario": 1,
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "pass_rate": 1.0
+  },
+  "whitepaper_validation": {
+    "bank_run_no_fail": true,
+    "peg_elasticity_95pct": true,
+    "incentive_ratio_500pct": true,
+    "demurrage_decay_to_zero": true,
+    "route_healing_zero_loss": true,
+    "max_normalized_conservation": 1.6477110832751664e-13
+  },
+  "scenarios": [
+    {
+      "scenario_name": "WP_BANK_RUN_EXACT",
+      "label": "WP: Bank Run Exact (λ=0.1, σ=2.0)",
+      "category": "whitepaper-exact",
+      "n_runs": 1,
+      "pass_rate": 1.0,
+      "conservation_error": {
+        "mean": 0.000025212764739990234,
+        "std_dev": 0.0,
+        "ci_lower": 0.000025212764739990234,
+        "ci_upper": 0.000025212764739990234,
+        "min": 0.000025212764739990234,
+        "max": 0.000025212764739990234,
+        "n": 1
+      },
+      "normalized_conservation_error": {
+        "mean": 9.96379501318633e-14,
+        "std_dev": 0.0,
+        "ci_lower": 9.96379501318633e-14,
+        "ci_upper": 9.96379501318633e-14,
+        "min": 9.96379501318633e-14,
+        "max": 9.96379501318633e-14,
+        "n": 1
+      },
+      "settlement_rate": {
+        "mean": 19.725901714547852,
+        "std_dev": 0.0,
+        "ci_lower": 19.725901714547852,
+        "ci_upper": 19.725901714547852,
+        "min": 19.725901714547852,
+        "max": 19.725901714547852,
+        "n": 1
+      },
+      "peg_elasticity_pct": {
+        "mean": 100.0,
+        "std_dev": 0.0,
+        "ci_lower": 100.0,
+        "ci_upper": 100.0,
+        "min": 100.0,
+        "max": 100.0,
+        "n": 1
+      },
+      "egress_profit": {
+        "mean": 157.28267832358435,
+        "std_dev": 0.0,
+        "ci_lower": 157.28267832358435,
+        "ci_upper": 157.28267832358435,
+        "min": 157.28267832358435,
+        "max": 157.28267832358435,
+        "n": 1
+      },
+      "transit_profit": {
+        "mean": 11.430752300694945,
+        "std_dev": 0.0,
+        "ci_lower": 11.430752300694945,
+        "ci_upper": 11.430752300694945,
+        "min": 11.430752300694945,
+        "max": 11.430752300694945,
+        "n": 1
+      },
+      "demurrage_total": {
+        "mean": 59379149.44252034,
+        "std_dev": 0.0,
+        "ci_lower": 59379149.44252034,
+        "ci_upper": 59379149.44252034,
+        "min": 59379149.44252034,
+        "max": 59379149.44252034,
+        "n": 1
+      },
+      "held_count": {
+        "mean": 561.0,
+        "std_dev": 0.0,
+        "ci_lower": 561.0,
+        "ci_upper": 561.0,
+        "min": 561.0,
+        "max": 561.0,
+        "n": 1
+      },
+      "elapsed_ms": {
+        "mean": 1206.0,
+        "std_dev": 0.0,
+        "ci_lower": 1206.0,
+        "ci_upper": 1206.0,
+        "min": 1206.0,
+        "max": 1206.0,
+        "n": 1
+      },
+      "throughput_per_sec": {
+        "mean": 1658.0389270847677,
+        "std_dev": 0.0,
+        "ci_lower": 1658.0389270847677,
+        "ci_upper": 1658.0389270847677,
+        "min": 1658.0389270847677,
+        "max": 1658.0389270847677,
+        "n": 1
+      },
+      "packets_per_tick": {
+        "mean": 8.7195,
+        "std_dev": 0.0,
+        "ci_lower": 8.7195,
+        "ci_upper": 8.7195,
+        "min": 8.7195,
+        "max": 8.7195,
+        "n": 1
+      },
+      "individual_runs": [
+        {
+          "scenario": "WP: Bank Run Exact (λ=0.1, σ=2.0)",
+          "name": "WP_BANK_RUN_EXACT",
+          "category": "whitepaper-exact",
+          "seed": 0,
+          "pass": true,
+          "settlement_count": 3440,
+          "revert_count": 10440,
+          "spawn_count": 17439,
+          "settlement_rate": 19.725901714547852,
+          "conservation_error": 0.000025212764739990234,
+          "normalized_conservation_error": 9.96379501318633e-14,
+          "avg_fee": 12.000000000000002,
+          "peak_fee": 15.000000000000002,
+          "dissolved_count": 0,
+          "held_count": 561,
+          "fee_cap_breaches": 0,
+          "settlement_finality": true,
+          "cost_certainty": true,
+          "audit_trail": true,
+          "tier_breakdown": [
+            519,
+            943,
+            1604,
+            493
+          ],
+          "ticks": 2000,
+          "elapsed_ms": 1206,
+          "packets_per_tick": 8.7195,
+          "demand_scale_factor": 2.041241452319315,
+          "egress_profit_total": 157.28267832358435,
+          "transit_profit_total": 11.430752300694945,
+          "demurrage_total": 59379149.44252034,
+          "conservation_holds": true,
+          "final_held_count": 561,
+          "final_orbit_count": 561,
+          "throughput_per_sec": 1658.0389270847677,
+          "peg_elasticity_pct": 100.0,
+          "max_normalized_conservation": 9.96379501318633e-14
+        }
+      ]
+    },
+    {
+      "scenario_name": "WP_ROUTE_HEALING",
+      "label": "WP: Route Healing (kill 2 Transit @ t=500)",
+      "category": "whitepaper-exact",
+      "n_runs": 1,
+      "pass_rate": 1.0,
+      "conservation_error": {
+        "mean": 0.000024110078811645508,
+        "std_dev": 0.0,
+        "ci_lower": 0.000024110078811645508,
+        "ci_upper": 0.000024110078811645508,
+        "min": 0.000024110078811645508,
+        "max": 0.000024110078811645508,
+        "n": 1
+      },
+      "normalized_conservation_error": {
+        "mean": 1.6477110832751664e-13,
+        "std_dev": 0.0,
+        "ci_lower": 1.6477110832751664e-13,
+        "ci_upper": 1.6477110832751664e-13,
+        "min": 1.6477110832751664e-13,
+        "max": 1.6477110832751664e-13,
+        "n": 1
+      },
+      "settlement_rate": {
+        "mean": 53.04218362282879,
+        "std_dev": 0.0,
+        "ci_lower": 53.04218362282879,
+        "ci_upper": 53.04218362282879,
+        "min": 53.04218362282879,
+        "max": 53.04218362282879,
+        "n": 1
+      },
+      "peg_elasticity_pct": {
+        "mean": 100.0,
+        "std_dev": 0.0,
+        "ci_lower": 100.0,
+        "ci_upper": 100.0,
+        "min": 100.0,
+        "max": 100.0,
+        "n": 1
+      },
+      "egress_profit": {
+        "mean": 4.280360924431203,
+        "std_dev": 0.0,
+        "ci_lower": 4.280360924431203,
+        "ci_upper": 4.280360924431203,
+        "min": 4.280360924431203,
+        "max": 4.280360924431203,
+        "n": 1
+      },
+      "transit_profit": {
+        "mean": 0.05161522168317337,
+        "std_dev": 0.0,
+        "ci_lower": 0.05161522168317337,
+        "ci_upper": 0.05161522168317337,
+        "min": 0.05161522168317337,
+        "max": 0.05161522168317337,
+        "n": 1
+      },
+      "demurrage_total": {
+        "mean": 96836322.97360551,
+        "std_dev": 0.0,
+        "ci_lower": 96836322.97360551,
+        "ci_upper": 96836322.97360551,
+        "min": 96836322.97360551,
+        "max": 96836322.97360551,
+        "n": 1
+      },
+      "held_count": {
+        "mean": 1303.0,
+        "std_dev": 0.0,
+        "ci_lower": 1303.0,
+        "ci_upper": 1303.0,
+        "min": 1303.0,
+        "max": 1303.0,
+        "n": 1
+      },
+      "elapsed_ms": {
+        "mean": 195.0,
+        "std_dev": 0.0,
+        "ci_lower": 195.0,
+        "ci_upper": 195.0,
+        "min": 195.0,
+        "max": 195.0,
+        "n": 1
+      },
+      "throughput_per_sec": {
+        "mean": 10215.102686093938,
+        "std_dev": 0.0,
+        "ci_lower": 10215.102686093938,
+        "ci_upper": 10215.102686093938,
+        "min": 10215.102686093938,
+        "max": 10215.102686093938,
+        "n": 1
+      },
+      "packets_per_tick": {
+        "mean": 5.0375,
+        "std_dev": 0.0,
+        "ci_lower": 5.0375,
+        "ci_upper": 5.0375,
+        "min": 5.0375,
+        "max": 5.0375,
+        "n": 1
+      },
+      "individual_runs": [
+        {
+          "scenario": "WP: Route Healing (kill 2 Transit @ t=500)",
+          "name": "WP_ROUTE_HEALING",
+          "category": "whitepaper-exact",
+          "seed": 0,
+          "pass": true,
+          "settlement_count": 5344,
+          "revert_count": 3428,
+          "spawn_count": 10075,
+          "settlement_rate": 53.04218362282879,
+          "conservation_error": 0.000024110078811645508,
+          "normalized_conservation_error": 1.6477110832751664e-13,
+          "avg_fee": 0.0784,
+          "peak_fee": 0.147,
+          "dissolved_count": 0,
+          "held_count": 1303,
+          "fee_cap_breaches": 0,
+          "settlement_finality": true,
+          "cost_certainty": true,
+          "audit_trail": true,
+          "tier_breakdown": [
+            187,
+            327,
+            612,
+            177
+          ],
+          "ticks": 2000,
+          "elapsed_ms": 195,
+          "packets_per_tick": 5.0375,
+          "demand_scale_factor": 2.041241452319315,
+          "egress_profit_total": 4.280360924431203,
+          "transit_profit_total": 0.05161522168317337,
+          "demurrage_total": 96836322.97360551,
+          "conservation_holds": true,
+          "final_held_count": 1303,
+          "final_orbit_count": 1303,
+          "throughput_per_sec": 10215.102686093938,
+          "peg_elasticity_pct": 100.0,
+          "max_normalized_conservation": 1.6477110832751664e-13
+        }
+      ]
+    },
+    {
+      "scenario_name": "WP_DEMURRAGE_EXACT",
+      "label": "WP: Demurrage Decay (8K ticks, low demand)",
+      "category": "whitepaper-exact",
+      "n_runs": 1,
+      "pass_rate": 1.0,
+      "conservation_error": {
+        "mean": 7.845461368560791e-6,
+        "std_dev": 0.0,
+        "ci_lower": 7.845461368560791e-6,
+        "ci_upper": 7.845461368560791e-6,
+        "min": 7.845461368560791e-6,
+        "max": 7.845461368560791e-6,
+        "n": 1
+      },
+      "normalized_conservation_error": {
+        "mean": 1.2986301337127563e-13,
+        "std_dev": 0.0,
+        "ci_lower": 1.2986301337127563e-13,
+        "ci_upper": 1.2986301337127563e-13,
+        "min": 1.2986301337127563e-13,
+        "max": 1.2986301337127563e-13,
+        "n": 1
+      },
+      "settlement_rate": {
+        "mean": 14.855433698903289,
+        "std_dev": 0.0,
+        "ci_lower": 14.855433698903289,
+        "ci_upper": 14.855433698903289,
+        "min": 14.855433698903289,
+        "max": 14.855433698903289,
+        "n": 1
+      },
+      "peg_elasticity_pct": {
+        "mean": 100.0,
+        "std_dev": 0.0,
+        "ci_lower": 100.0,
+        "ci_upper": 100.0,
+        "min": 100.0,
+        "max": 100.0,
+        "n": 1
+      },
+      "egress_profit": {
+        "mean": 0.42306367006448403,
+        "std_dev": 0.0,
+        "ci_lower": 0.42306367006448403,
+        "ci_upper": 0.42306367006448403,
+        "min": 0.42306367006448403,
+        "max": 0.42306367006448403,
+        "n": 1
+      },
+      "transit_profit": {
+        "mean": 0.010421398400000014,
+        "std_dev": 0.0,
+        "ci_lower": 0.010421398400000014,
+        "ci_upper": 0.010421398400000014,
+        "min": 0.010421398400000014,
+        "max": 0.010421398400000014,
+        "n": 1
+      },
+      "demurrage_total": {
+        "mean": 57777413.973918006,
+        "std_dev": 0.0,
+        "ci_lower": 57777413.973918006,
+        "ci_upper": 57777413.973918006,
+        "min": 57777413.973918006,
+        "max": 57777413.973918006,
+        "n": 1
+      },
+      "held_count": {
+        "mean": 184.0,
+        "std_dev": 0.0,
+        "ci_lower": 184.0,
+        "ci_upper": 184.0,
+        "min": 184.0,
+        "max": 184.0,
+        "n": 1
+      },
+      "elapsed_ms": {
+        "mean": 128.0,
+        "std_dev": 0.0,
+        "ci_lower": 128.0,
+        "ci_upper": 128.0,
+        "min": 128.0,
+        "max": 128.0,
+        "n": 1
+      },
+      "throughput_per_sec": {
+        "mean": 62169.587584285735,
+        "std_dev": 0.0,
+        "ci_lower": 62169.587584285735,
+        "ci_upper": 62169.587584285735,
+        "min": 62169.587584285735,
+        "max": 62169.587584285735,
+        "n": 1
+      },
+      "packets_per_tick": {
+        "mean": 0.5015,
+        "std_dev": 0.0,
+        "ci_lower": 0.5015,
+        "ci_upper": 0.5015,
+        "min": 0.5015,
+        "max": 0.5015,
+        "n": 1
+      },
+      "individual_runs": [
+        {
+          "scenario": "WP: Demurrage Decay (8K ticks, low demand)",
+          "name": "WP_DEMURRAGE_EXACT",
+          "category": "whitepaper-exact",
+          "seed": 0,
+          "pass": true,
+          "settlement_count": 596,
+          "revert_count": 3195,
+          "spawn_count": 4012,
+          "settlement_rate": 14.855433698903289,
+          "conservation_error": 7.845461368560791e-6,
+          "normalized_conservation_error": 1.2986301337127563e-13,
+          "avg_fee": 0.0784,
+          "peak_fee": 0.147,
+          "dissolved_count": 37,
+          "held_count": 184,
+          "fee_cap_breaches": 0,
+          "settlement_finality": true,
+          "cost_certainty": true,
+          "audit_trail": true,
+          "tier_breakdown": [
+            17,
+            30,
+            59,
+            78
+          ],
+          "ticks": 8000,
+          "elapsed_ms": 128,
+          "packets_per_tick": 0.5015,
+          "demand_scale_factor": 1.0,
+          "egress_profit_total": 0.42306367006448403,
+          "transit_profit_total": 0.010421398400000014,
+          "demurrage_total": 57777413.973918006,
+          "conservation_holds": true,
+          "final_held_count": 184,
+          "final_orbit_count": 184,
+          "throughput_per_sec": 62169.587584285735,
+          "peg_elasticity_pct": 100.0,
+          "max_normalized_conservation": 1.2986301337127563e-13
+        }
+      ]
+    }
+  ]
+}

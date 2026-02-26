@@ -1,0 +1,556 @@
+{
+  "worldState": null,
+  "metrics": [],
+  "benchResults": [
+    {
+      "scenario": "Pax Romana",
+      "settlementCount": 0,
+      "revertCount": 6,
+      "avgFee": 65.70601413653976,
+      "conservationError": 9.094947017729282e-12,
+      "totalInput": 14700,
+      "totalOutput": 0.21222928289646736,
+      "pass": false,
+      "ticks": 200,
+      "peakFee": 67.90621088727208
+    },
+    {
+      "scenario": "Firehose",
+      "settlementCount": 24,
+      "revertCount": 140,
+      "avgFee": 0.4,
+      "conservationError": 2.0954757928848267e-9,
+      "totalInput": 774600,
+      "totalOutput": 528.7801071578169,
+      "pass": true,
+      "ticks": 200,
+      "peakFee": 57.012230543235596
+    },
+    {
+      "scenario": "Bank Run",
+      "settlementCount": 0,
+      "revertCount": 8,
+      "avgFee": 34.31089998890655,
+      "conservationError": 9.094947017729282e-12,
+      "totalInput": 15800,
+      "totalOutput": 0.38265832379783477,
+      "pass": false,
+      "ticks": 200,
+      "peakFee": 41.64667187413207
+    },
+    {
+      "scenario": "Flash Crash",
+      "settlementCount": 23,
+      "revertCount": 573,
+      "avgFee": 0.4,
+      "conservationError": 6.51925802230835e-9,
+      "totalInput": 1160000,
+      "totalOutput": 553.4583911169855,
+      "pass": true,
+      "ticks": 200,
+      "peakFee": 0.5
+    },
+    {
+      "scenario": "Drought",
+      "settlementCount": 0,
+      "revertCount": 0,
+      "avgFee": 2.7777777777777776e-9,
+      "conservationError": 0,
+      "totalInput": 0,
+      "totalOutput": 0,
+      "pass": false,
+      "ticks": 200,
+      "peakFee": 2.7777777777777776e-9
+    }
+  ],
+  "runStats": null,
+  "nodes": [
+    {
+      "id": 0,
+      "role": "Ingress",
+      "x": 0,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        1,
+        6
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 1,
+      "role": "Egress",
+      "x": 1,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        0,
+        2,
+        7
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 2,
+      "role": "Transit",
+      "x": 2,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        1,
+        3,
+        8
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 3,
+      "role": "NGauge",
+      "x": 3,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        2,
+        4,
+        9
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 4,
+      "role": "Ingress",
+      "x": 4,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        3,
+        5,
+        10
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 5,
+      "role": "Egress",
+      "x": 5,
+      "y": 0,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        4,
+        11
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 6,
+      "role": "Transit",
+      "x": 0,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        7,
+        0,
+        12
+      ],
+      "distance_to_egress": 2,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 7,
+      "role": "NGauge",
+      "x": 1,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        6,
+        8,
+        1,
+        13
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 8,
+      "role": "Ingress",
+      "x": 2,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        7,
+        9,
+        2,
+        14
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 9,
+      "role": "Egress",
+      "x": 3,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        8,
+        10,
+        3,
+        15
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 10,
+      "role": "Transit",
+      "x": 4,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        9,
+        11,
+        4,
+        16
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 11,
+      "role": "NGauge",
+      "x": 5,
+      "y": 1,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        10,
+        5,
+        17
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 12,
+      "role": "Ingress",
+      "x": 0,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        13,
+        6,
+        18
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 13,
+      "role": "Egress",
+      "x": 1,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        12,
+        14,
+        7,
+        19
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 14,
+      "role": "Transit",
+      "x": 2,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        13,
+        15,
+        8,
+        20
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 15,
+      "role": "NGauge",
+      "x": 3,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        14,
+        16,
+        9,
+        21
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 16,
+      "role": "Ingress",
+      "x": 4,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        15,
+        17,
+        10,
+        22
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 17,
+      "role": "Egress",
+      "x": 5,
+      "y": 2,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        16,
+        11,
+        23
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 18,
+      "role": "Transit",
+      "x": 0,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        19,
+        12
+      ],
+      "distance_to_egress": 2,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 19,
+      "role": "NGauge",
+      "x": 1,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        18,
+        20,
+        13
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 20,
+      "role": "Ingress",
+      "x": 2,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        19,
+        21,
+        14
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    },
+    {
+      "id": 21,
+      "role": "Egress",
+      "x": 3,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        20,
+        22,
+        15
+      ],
+      "distance_to_egress": 0,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "RiskAverse",
+      "pressure": 0
+    },
+    {
+      "id": 22,
+      "role": "Transit",
+      "x": 4,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        21,
+        23,
+        16
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Greedy",
+      "pressure": 0
+    },
+    {
+      "id": 23,
+      "role": "NGauge",
+      "x": 5,
+      "y": 3,
+      "inventory_fiat": 10000,
+      "inventory_crypto": 100,
+      "current_buffer_count": 0,
+      "neighbors": [
+        22,
+        17
+      ],
+      "distance_to_egress": 1,
+      "trust_score": 0.5,
+      "total_fees_earned": 0,
+      "accumulated_work": 0,
+      "strategy": "Passive",
+      "pressure": 0
+    }
+  ],
+  "packets": [],
+  "timestamp": "2026-02-21T04:54:41.906Z",
+  "version": "0.6.0"
+}

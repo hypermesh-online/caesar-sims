@@ -1,0 +1,170 @@
+{
+  "timestamp": "1771845502621",
+  "version": "1.0.0",
+  "prng": "ChaCha8Rng",
+  "n_runs_per_scenario": 1,
+  "summary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "pass_rate": 1.0
+  },
+  "whitepaper_validation": {
+    "bank_run_no_fail": true,
+    "peg_elasticity_95pct": true,
+    "incentive_ratio_500pct": false,
+    "demurrage_decay_to_zero": true,
+    "route_healing_zero_loss": true,
+    "max_normalized_conservation": 5.257590481302906e-13
+  },
+  "scenarios": [
+    {
+      "scenario_name": "WP_INCENTIVE_DROUGHT",
+      "label": "WP: Incentive Drought",
+      "category": "whitepaper",
+      "n_runs": 1,
+      "pass_rate": 1.0,
+      "conservation_error": {
+        "mean": 0.0001323223114013672,
+        "std_dev": 0.0,
+        "ci_lower": 0.0001323223114013672,
+        "ci_upper": 0.0001323223114013672,
+        "min": 0.0001323223114013672,
+        "max": 0.0001323223114013672,
+        "n": 1
+      },
+      "normalized_conservation_error": {
+        "mean": 5.257590481302906e-13,
+        "std_dev": 0.0,
+        "ci_lower": 5.257590481302906e-13,
+        "ci_upper": 5.257590481302906e-13,
+        "min": 5.257590481302906e-13,
+        "max": 5.257590481302906e-13,
+        "n": 1
+      },
+      "settlement_rate": {
+        "mean": 35.83542521275944,
+        "std_dev": 0.0,
+        "ci_lower": 35.83542521275944,
+        "ci_upper": 35.83542521275944,
+        "min": 35.83542521275944,
+        "max": 35.83542521275944,
+        "n": 1
+      },
+      "peg_elasticity_pct": {
+        "mean": 100.0,
+        "std_dev": 0.0,
+        "ci_lower": 100.0,
+        "ci_upper": 100.0,
+        "min": 100.0,
+        "max": 100.0,
+        "n": 1
+      },
+      "egress_profit": {
+        "mean": 7.7988507964818625,
+        "std_dev": 0.0,
+        "ci_lower": 7.7988507964818625,
+        "ci_upper": 7.7988507964818625,
+        "min": 7.7988507964818625,
+        "max": 7.7988507964818625,
+        "n": 1
+      },
+      "transit_profit": {
+        "mean": 0.12822464141454962,
+        "std_dev": 0.0,
+        "ci_lower": 0.12822464141454962,
+        "ci_upper": 0.12822464141454962,
+        "min": 0.12822464141454962,
+        "max": 0.12822464141454962,
+        "n": 1
+      },
+      "demurrage_total": {
+        "mean": 196814446.9599623,
+        "std_dev": 0.0,
+        "ci_lower": 196814446.9599623,
+        "ci_upper": 196814446.9599623,
+        "min": 196814446.9599623,
+        "max": 196814446.9599623,
+        "n": 1
+      },
+      "held_count": {
+        "mean": 2100.0,
+        "std_dev": 0.0,
+        "ci_lower": 2100.0,
+        "ci_upper": 2100.0,
+        "min": 2100.0,
+        "max": 2100.0,
+        "n": 1
+      },
+      "elapsed_ms": {
+        "mean": 456.0,
+        "std_dev": 0.0,
+        "ci_lower": 456.0,
+        "ci_upper": 456.0,
+        "min": 456.0,
+        "max": 456.0,
+        "n": 1
+      },
+      "throughput_per_sec": {
+        "mean": 4380.604032816489,
+        "std_dev": 0.0,
+        "ci_lower": 4380.604032816489,
+        "ci_upper": 4380.604032816489,
+        "min": 4380.604032816489,
+        "max": 4380.604032816489,
+        "n": 1
+      },
+      "packets_per_tick": {
+        "mean": 8.1665,
+        "std_dev": 0.0,
+        "ci_lower": 8.1665,
+        "ci_upper": 8.1665,
+        "min": 8.1665,
+        "max": 8.1665,
+        "n": 1
+      },
+      "individual_runs": [
+        {
+          "scenario": "WP: Incentive Drought",
+          "name": "WP_INCENTIVE_DROUGHT",
+          "category": "whitepaper",
+          "seed": 0,
+          "pass": true,
+          "settlement_count": 5853,
+          "revert_count": 8380,
+          "spawn_count": 16333,
+          "settlement_rate": 35.83542521275944,
+          "conservation_error": 0.0001323223114013672,
+          "normalized_conservation_error": 5.257590481302906e-13,
+          "avg_fee": 0.2352,
+          "peak_fee": 0.2352,
+          "dissolved_count": 0,
+          "held_count": 2100,
+          "fee_cap_breaches": 0,
+          "settlement_finality": true,
+          "cost_certainty": true,
+          "audit_trail": true,
+          "tier_breakdown": [
+            258,
+            480,
+            991,
+            371
+          ],
+          "ticks": 2000,
+          "elapsed_ms": 456,
+          "packets_per_tick": 8.1665,
+          "demand_scale_factor": 2.041241452319315,
+          "egress_profit_total": 7.7988507964818625,
+          "transit_profit_total": 0.12822464141454962,
+          "demurrage_total": 196814446.9599623,
+          "conservation_holds": true,
+          "final_held_count": 2100,
+          "final_orbit_count": 2100,
+          "throughput_per_sec": 4380.604032816489,
+          "peg_elasticity_pct": 100.0,
+          "max_normalized_conservation": 5.257590481302906e-13
+        }
+      ]
+    }
+  ]
+}

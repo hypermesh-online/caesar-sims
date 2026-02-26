@@ -1,0 +1,38 @@
+{
+  "timestamp": "1771832452517",
+  "version": "0.2.0",
+  "summary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0
+  },
+  "benchmarks": [
+    {
+      "scenario": "Normal Market",
+      "name": "NORMAL_MARKET",
+      "category": "market",
+      "pass": true,
+      "settlement_count": 456,
+      "revert_count": 0,
+      "spawn_count": 600,
+      "settlement_rate": 76.0,
+      "conservation_error": 5.774199962615967e-8,
+      "avg_fee": 0.08038095238095239,
+      "peak_fee": 0.10049999999999998,
+      "dissolved_count": 0,
+      "held_count": 35,
+      "fee_cap_breaches": 0,
+      "settlement_finality": true,
+      "cost_certainty": true,
+      "audit_trail": true,
+      "tier_breakdown": [
+        7,
+        19,
+        12,
+        106
+      ],
+      "ticks": 600,
+      "elapsed_ms": 37
+    }
+  ]
+}
